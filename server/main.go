@@ -2,11 +2,13 @@ package main
 
 import (
 	"github.com/SamiCenkci/Shopping-Website/auth"
+	"github.com/SamiCenkci/Shopping-Website/chat"
 	"github.com/SamiCenkci/Shopping-Website/config"
 	"github.com/SamiCenkci/Shopping-Website/db"
 	dbgen "github.com/SamiCenkci/Shopping-Website/db/generated"
 	"github.com/SamiCenkci/Shopping-Website/listing"
 	"github.com/SamiCenkci/Shopping-Website/upload"
+	"github.com/SamiCenkci/Shopping-Website/user"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -31,6 +33,11 @@ func main() {
 		SecretKey: cfg.AWSSecretAccessKey,
 		Bucket:    cfg.S3Bucket,
 	}
+
+	userHandler := &user.Handler{Queries: queries}
+
+	chatHub := chat.NewHub()
+	chatHandler := &chat.Handler{Queries: queries, Hub: chatHub}
 
 	router := gin.Default()
 
@@ -60,8 +67,18 @@ func main() {
 		api.POST("/listings", auth.RequireAuth(cfg.JWTSecret), listingHandler.Create)
 		api.PUT("/listings/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.Update)
 		api.DELETE("/listings/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.Delete)
-		api.POST("/uploads/presign", auth.RequireAuth(cfg.JWTSecret), uploadHandler.Presign)
 		api.PUT("/listings/:id/status", auth.RequireAuth(cfg.JWTSecret), listingHandler.SetStatus)
+
+		api.POST("/uploads/presign", auth.RequireAuth(cfg.JWTSecret), uploadHandler.Presign)
+
+		api.GET("/users/:id", userHandler.GetProfile)
+		api.PUT("/users/me", auth.RequireAuth(cfg.JWTSecret), userHandler.UpdateMe)
+
+		api.POST("/conversations", auth.RequireAuth(cfg.JWTSecret), chatHandler.Start)
+		api.GET("/conversations", auth.RequireAuth(cfg.JWTSecret), chatHandler.List)
+		api.GET("/conversations/:id/messages", auth.RequireAuth(cfg.JWTSecret), chatHandler.Messages)
+		api.POST("/conversations/:id/messages", auth.RequireAuth(cfg.JWTSecret), chatHandler.Send)
+		api.GET("/ws", auth.RequireAuthWS(cfg.JWTSecret), chatHandler.WebSocket)
 	}
 
 	router.Run(":" + cfg.Port)

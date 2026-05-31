@@ -1,10 +1,24 @@
+import ThemeToggle from "@/components/ThemeToggle";
+
 export default function Footer() {
   return (
-    <footer className="border-t border-line bg-surface mt-12">
-      <div className="max-w-[1400px] mx-auto px-[5%] py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-ink-secondary">
-        <span className="font-bold text-brand text-base">Rego</span>
-        <p>Kjøp og selg brukte ting, enkelt og trygt.</p>
-        <p className="text-ink-muted">© {new Date().getFullYear()} Rego</p>
+    <footer className="border-t border-line bg-surface mt-16">
+      <div className="max-w-[1400px] mx-auto px-[5%] py-10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 text-center sm:text-left">
+          <div>
+            <span className="font-bold text-brand text-lg tracking-tight">Total</span>
+            <p className="text-sm text-ink-secondary mt-1">Kjøp og selg brukte ting, enkelt og trygt.</p>
+          </div>
+          <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-sm text-ink-secondary">
+            <span className="hover:text-brand cursor-pointer">Om oss</span>
+            <span className="hover:text-brand cursor-pointer">Hjelp</span>
+            <span className="hover:text-brand cursor-pointer">Personvern</span>
+            <ThemeToggle />
+          </div>
+        </div>
+        <div className="border-t border-line mt-8 pt-6 text-xs text-ink-muted text-center">
+          © {new Date().getFullYear()} Total. Laget med Next.js og Go.
+        </div>
       </div>
     </footer>
   );

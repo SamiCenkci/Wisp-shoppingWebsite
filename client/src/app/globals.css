@@ -1,20 +1,89 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-brand: #19A84D;
-  --color-brand-dark: #158F42;
+  --color-brand: #1A9E4B;
+  --color-brand-dark: #157A3A;
+  --color-brand-darker: #0F5C2C;
   --color-brand-light: #2FC962;
-  --color-brand-lightest: #EEFCF3;
-  --color-ink: #111827;
-  --color-ink-secondary: #6B7280;
-  --color-ink-muted: #9CA3AF;
+  --color-brand-lightest: #EAF8EF;
+
+  --color-ink: #1A1D1F;
+  --color-ink-secondary: #6B7178;
+  --color-ink-muted: #A0A6AC;
+
   --color-surface: #FFFFFF;
-  --color-subtle: #F9FAFB;
-  --color-line: #E5E7EB;
+  --color-subtle: #F6F7F8;
+  --color-line: #ECEEF0;
+  --color-line-strong: #DCDFE3;
+
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 24px -6px rgba(16, 24, 40, 0.10), 0 4px 8px -4px rgba(16, 24, 40, 0.05);
+  --shadow-brand: 0 12px 28px -8px rgba(26, 158, 75, 0.22), 0 4px 10px -4px rgba(16, 24, 40, 0.06);
+}
+
+/* Dark mode — override the token values when .dark is on <html> */
+.dark {
+  --color-brand: #2FC962;
+  --color-brand-dark: #1A9E4B;
+  --color-brand-lightest: #14301F;
+
+  --color-ink: #E8EAED;
+  --color-ink-secondary: #9AA0A6;
+  --color-ink-muted: #6B7178;
+
+  --color-surface: #1C1F23;
+  --color-subtle: #14171A;
+  --color-line: #2A2E33;
+  --color-line-strong: #3A3F45;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: #F9FAFB;
-  color: #111827;
+  background: var(--color-subtle);
+  color: var(--color-ink);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+button, a, input, select, textarea {
+  transition: all 0.15s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 3px rgba(26, 158, 75, 0.12);
+}
+
+/* Hide number input spinner arrows (price fields) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Dark-mode styling for select dropdowns and their options */
+.dark select {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+}
+.dark select option {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+}
+
+/* Dark-mode styling for date/number/text inputs that may render light */
+.dark input,
+.dark textarea {
+  color-scheme: dark;
 }

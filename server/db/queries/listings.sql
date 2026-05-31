@@ -1,6 +1,6 @@
 -- name: CreateListing :one
-INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetListingByID :one
@@ -8,6 +8,8 @@ SELECT * FROM listings WHERE id = $1;
 
 -- name: ListListings :many
 SELECT * FROM listings
+WHERE status = 'active'
+  AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
@@ -30,6 +32,8 @@ DELETE FROM listings WHERE id = $1;
 -- name: GetSimilarListings :many
 SELECT * FROM listings
 WHERE category = $1 AND id != $2
+  AND status = ''active'
+  AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC
 LIMIT 4;
 

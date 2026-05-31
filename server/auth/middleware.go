@@ -12,7 +12,6 @@ import (
 // attaches the user's ID. If not, it rejects with 401 Unauthorized.
 func RequireAuth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Expect header: "Authorization: Bearer <token>"
 		header := c.GetHeader("Authorization")
 		if header == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
@@ -20,7 +19,6 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		// Split "Bearer <token>" into two parts
 		parts := strings.SplitN(header, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization format"})
@@ -28,7 +26,6 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		// Verify the token and pull out the user ID
 		userID, err := ParseToken(parts[1], jwtSecret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
@@ -36,7 +33,39 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		// Stash the user ID so later handlers can read it
+		c.Set("userID", userID)
+		c.Next()
+	}
+}
+
+// RequireAuthWS is like RequireAuth but also accepts the token from a ?token= query param,
+// since browsers can't set headers on WebSocket connections.
+func RequireAuthWS(jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenStr := c.Query("token")
+
+		// Fall back to the Authorization header if no query token
+		if tokenStr == "" {
+			header := c.GetHeader("Authorization")
+			parts := strings.SplitN(header, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tokenStr = parts[1]
+			}
+		}
+
+		if tokenStr == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
+			c.Abort()
+			return
+		}
+
+		userID, err := ParseToken(tokenStr, jwtSecret)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			c.Abort()
+			return
+		}
+
 		c.Set("userID", userID)
 		c.Next()
 	}

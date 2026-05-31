@@ -14,6 +14,7 @@ type Listing = {
   category: string;
   county: string;
   municipality: string;
+  ad_type?: string;
   images?: Image[];
 };
 
@@ -26,19 +27,28 @@ export default function HomePage() {
     query: "",
     category: "",
     county: "",
+    condition: "",
+    ad_type: "",
     min_price: "",
     max_price: "",
     sort_by: "newest",
   });
   const [isSearchResult, setIsSearchResult] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
-  // Load all listings, and pick up ?q= from the navbar search
   useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("recentSearches") || "[]");
+      if (Array.isArray(saved)) setRecentSearches(saved);
+    } catch {}
+
     const q = searchParams.get("q") ?? "";
     if (q) {
       setFilters((prev) => ({ ...prev, query: q }));
       runSearch({ query: q });
     } else {
+      setIsSearchResult(false);
+      setFilters({ query: "", category: "", county: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
       api("/api/listings")
         .then((data) => setListings(data ?? []))
         .catch(() => {})
@@ -51,6 +61,21 @@ export default function HomePage() {
     setFilters((prev) => ({ ...prev, [field]: value }));
   }
 
+  function saveSearch(term: string) {
+    const t = term.trim();
+    if (!t) return;
+    setRecentSearches((prev) => {
+      const next = [t, ...prev.filter((s) => s.toLowerCase() !== t.toLowerCase())].slice(0, 5);
+      localStorage.setItem("recentSearches", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function clearRecent() {
+    setRecentSearches([]);
+    localStorage.removeItem("recentSearches");
+  }
+
   async function runSearch(override?: Partial<typeof filters>) {
     setLoading(true);
     const f = { ...filters, ...override };
@@ -59,6 +84,8 @@ export default function HomePage() {
         query: f.query,
         category: f.category,
         county: f.county,
+        condition: f.condition,
+        ad_type: f.ad_type,
         min_price: f.min_price ? Math.round(parseFloat(f.min_price) * 100) : 0,
         max_price: f.max_price ? Math.round(parseFloat(f.max_price) * 100) : 0,
         sort_by: f.sort_by,
@@ -69,6 +96,7 @@ export default function HomePage() {
       });
       setListings(data ?? []);
       setIsSearchResult(true);
+      if (f.query) saveSearch(f.query);
     } catch (err) {
       console.error(err);
     } finally {
@@ -77,7 +105,7 @@ export default function HomePage() {
   }
 
   async function resetAll() {
-    setFilters({ query: "", category: "", county: "", min_price: "", max_price: "", sort_by: "newest" });
+    setFilters({ query: "", category: "", county: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
     setLoading(true);
     try {
       const data = await api("/api/listings");
@@ -119,58 +147,70 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-[1400px] mx-auto px-[5%] py-8 flex gap-8">
-        <aside className="w-64 shrink-0 hidden lg:block">
-          <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm sticky top-24">
-            <h2 className="font-semibold text-ink mb-4">Filtrer søk</h2>
+        {isSearchResult && (
+          <aside className="w-64 shrink-0 hidden lg:block">
+            <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm sticky top-24">
+              <h2 className="font-semibold text-ink mb-4">Filtrer søk</h2>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1">Søkeord</label>
-                <input value={filters.query} onChange={(e) => update("query", e.target.value)} className={inputClass} placeholder="Søkeord..." />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1">Kategori</label>
-                <select value={filters.category} onChange={(e) => update("category", e.target.value)} className={inputClass}>
-                  <option value="">Alle kategorier</option>
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1">Fylke</label>
-                <input value={filters.county} onChange={(e) => update("county", e.target.value)} className={inputClass} placeholder="f.eks. Oslo" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Fra kr</label>
-                  <input type="number" value={filters.min_price} onChange={(e) => update("min_price", e.target.value)} className={inputClass} />
+                  <label className="block text-sm font-medium text-ink mb-1">Postnummer</label>
+                  <input value={filters.county} onChange={(e) => update("county", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="f.eks. 0150" maxLength={4} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Til kr</label>
-                  <input type="number" value={filters.max_price} onChange={(e) => update("max_price", e.target.value)} className={inputClass} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1">Sortering</label>
-                <select value={filters.sort_by} onChange={(e) => update("sort_by", e.target.value)} className={inputClass}>
-                  <option value="newest">Nyeste først</option>
-                  <option value="price_asc">Pris: lav til høy</option>
-                  <option value="price_desc">Pris: høy til lav</option>
-                </select>
-              </div>
 
-              <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
-                Bruk filtre
-              </button>
-              {isSearchResult && (
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Type annonse</label>
+                  <select value={filters.ad_type} onChange={(e) => update("ad_type", e.target.value)} className={inputClass}>
+                    <option value="">Alle</option>
+                    <option value="sale">Til salgs</option>
+                    <option value="giveaway">Gis bort</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-2">Prisklasse</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-ink-muted mb-1">Fra</label>
+                      <input type="number" value={filters.min_price} onChange={(e) => update("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="0 kr" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-ink-muted mb-1">Til</label>
+                      <input type="number" value={filters.max_price} onChange={(e) => update("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="Maks" />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Tilstand</label>
+                  <select value={filters.condition} onChange={(e) => update("condition", e.target.value)} className={inputClass}>
+                    <option value="">Alle</option>
+                    <option value="new">Ny</option>
+                    <option value="like_new">Som ny</option>
+                    <option value="good">God</option>
+                    <option value="fair">Brukbar</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Sortering</label>
+                  <select value={filters.sort_by} onChange={(e) => update("sort_by", e.target.value)} className={inputClass}>
+                    <option value="newest">Nyeste først</option>
+                    <option value="price_asc">Pris: lav til høy</option>
+                    <option value="price_desc">Pris: høy til lav</option>
+                  </select>
+                </div>
+
+                <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
+                  Bruk filtre
+                </button>
                 <button onClick={resetAll} className="w-full text-sm text-ink-secondary hover:text-brand underline">
                   Nullstill
                 </button>
-              )}
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
         <section className="flex-1">
           <div className="flex items-center justify-between mb-5">
@@ -180,6 +220,11 @@ export default function HomePage() {
                 ({listings.length})
               </span>
             </h1>
+            {isSearchResult && (
+              <button onClick={resetAll} className="text-sm text-ink-secondary hover:text-brand underline">
+                Vis alle annonser
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -217,11 +262,16 @@ export default function HomePage() {
                     <span className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-surface/90 text-ink-secondary backdrop-blur">
                       {listing.category}
                     </span>
+                    {listing.ad_type === "giveaway" && (
+                      <span className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium bg-brand text-white">
+                        Gis bort
+                      </span>
+                    )}
                   </div>
                   <div className="p-4">
                     <h3 className="font-medium truncate text-ink">{listing.title}</h3>
                     <p className="font-semibold mt-1 text-lg text-ink">
-                      {(listing.price_ore / 100).toLocaleString("nb-NO")} kr
+                      {listing.ad_type === "giveaway" ? "Gratis" : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
                     </p>
                     <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}, {listing.county}</p>
                   </div>

@@ -37,6 +37,7 @@ type Listing struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	Status       string             `json:"status"`
+	AdType       string             `json:"ad_type"`
 }
 
 type ListingImage struct {
@@ -73,4 +74,13 @@ type User struct {
 	AvatarUrl     pgtype.Text        `json:"avatar_url"`
 	EmailVerified bool               `json:"email_verified"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	DisplayName   string             `json:"display_name"`
+	Bio           string             `json:"bio"`
+	Phone         string             `json:"phone"`
+	BirthYear     string             `json:"birth_year"`
+	Gender        string             `json:"gender"`
+	StreetAddress string             `json:"street_address"`
+	PostalCode    string             `json:"postal_code"`
+	City          string             `json:"city"`
+	Country       string             `json:"country"`
 }

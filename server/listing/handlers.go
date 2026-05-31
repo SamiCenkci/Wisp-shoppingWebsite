@@ -26,6 +26,7 @@ type createRequest struct {
 	Condition    string   `json:"condition" binding:"required"`
 	County       string   `json:"county" binding:"required"`
 	Municipality string   `json:"municipality" binding:"required"`
+	AdType       string   `json:"ad_type"`
 	Images       []string `json:"images"`
 }
 
@@ -43,6 +44,11 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
+	adType := req.AdType
+	if adType != "giveaway" {
+		adType = "sale"
+	}
+
 	listing, err := h.Queries.CreateListing(context.Background(), db.CreateListingParams{
 		UserID:       pgUUID(userID),
 		Title:        req.Title,
@@ -53,7 +59,9 @@ func (h *Handler) Create(c *gin.Context) {
 		Condition:    req.Condition,
 		County:       req.County,
 		Municipality: req.Municipality,
+		AdType:       adType,
 	})
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -83,7 +91,6 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	// Attach images to each listing
 	type listingWithImages struct {
 		db.Listing
 		Images []db.ListingImage `json:"images"`
@@ -114,7 +121,8 @@ func (h *Handler) GetOne(c *gin.Context) {
 
 	images, _ := h.Queries.GetImagesByListing(context.Background(), listing.ID)
 
-	// Find similar listings in the same category
+	seller, _ := h.Queries.GetUserByID(context.Background(), listing.UserID)
+
 	similar, _ := h.Queries.GetSimilarListings(context.Background(), db.GetSimilarListingsParams{
 		Category: listing.Category,
 		ID:       listing.ID,
@@ -137,6 +145,13 @@ func (h *Handler) GetOne(c *gin.Context) {
 		"listing": listing,
 		"images":  images,
 		"similar": similarOut,
+		"seller": gin.H{
+			"id":           seller.ID,
+			"name":         seller.Name,
+			"display_name": seller.DisplayName,
+			"avatar_url":   seller.AvatarUrl.String,
+			"created_at":   seller.CreatedAt.Time,
+		},
 	})
 }
 
@@ -210,12 +225,14 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 type searchRequest struct {
-	Query    string `json:"query"`
-	Category string `json:"category"`
-	County   string `json:"county"`
-	MinPrice int32  `json:"min_price"`
-	MaxPrice int32  `json:"max_price"`
-	SortBy   string `json:"sort_by"`
+	Query     string `json:"query"`
+	Category  string `json:"category"`
+	County    string `json:"county"`
+	Condition string `json:"condition"`
+	AdType    string `json:"ad_type"`
+	MinPrice  int32  `json:"min_price"`
+	MaxPrice  int32  `json:"max_price"`
+	SortBy    string `json:"sort_by"`
 }
 
 func (h *Handler) Search(c *gin.Context) {
@@ -225,15 +242,20 @@ func (h *Handler) Search(c *gin.Context) {
 		return
 	}
 
-	sql := "SELECT * FROM listings WHERE 1=1"
+	sql := "SELECT * FROM listings WHERE status = 'active' AND created_at > NOW() - INTERVAL '60 days'"
 	args := []interface{}{}
 	argN := 1
 
 	if req.Query != "" {
-		sql += " AND (title ILIKE $" + strconv.Itoa(argN) + " OR description ILIKE $" + strconv.Itoa(argN) + ")"
+		p := strconv.Itoa(argN)
+		sql += " AND (title ILIKE $" + p +
+			" OR description ILIKE $" + p +
+			" OR similarity(title, $" + strconv.Itoa(argN+1) + ") > 0.2)"
 		args = append(args, "%"+req.Query+"%")
-		argN++
+		args = append(args, req.Query)
+		argN += 2
 	}
+
 	if req.Category != "" {
 		sql += " AND category = $" + strconv.Itoa(argN)
 		args = append(args, req.Category)
@@ -242,6 +264,16 @@ func (h *Handler) Search(c *gin.Context) {
 	if req.County != "" {
 		sql += " AND county = $" + strconv.Itoa(argN)
 		args = append(args, req.County)
+		argN++
+	}
+	if req.Condition != "" {
+		sql += " AND condition = $" + strconv.Itoa(argN)
+		args = append(args, req.Condition)
+		argN++
+	}
+	if req.AdType != "" {
+		sql += " AND ad_type = $" + strconv.Itoa(argN)
+		args = append(args, req.AdType)
 		argN++
 	}
 	if req.MinPrice > 0 {
@@ -261,8 +293,13 @@ func (h *Handler) Search(c *gin.Context) {
 	case "price_desc":
 		sql += " ORDER BY price_ore DESC"
 	default:
-		sql += " ORDER BY created_at DESC"
+		if req.Query != "" {
+			sql += " ORDER BY similarity(title, '" + sanitize(req.Query) + "') DESC, created_at DESC"
+		} else {
+			sql += " ORDER BY created_at DESC"
+		}
 	}
+
 	sql += " LIMIT 50"
 
 	rows, err := h.Pool.Query(context.Background(), sql, args...)
@@ -277,7 +314,21 @@ func (h *Handler) Search(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, results)
+
+	type listingWithImages struct {
+		db.Listing
+		Images []db.ListingImage `json:"images"`
+	}
+	out := make([]listingWithImages, 0, len(results))
+	for _, l := range results {
+		imgs, _ := h.Queries.GetImagesByListing(context.Background(), l.ID)
+		if imgs == nil {
+			imgs = []db.ListingImage{}
+		}
+		out = append(out, listingWithImages{Listing: l, Images: imgs})
+	}
+
+	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) Mine(c *gin.Context) {
@@ -347,4 +398,15 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "status oppdatert"})
+}
+
+// sanitize strips single quotes to keep an inline string safe in SQL.
+func sanitize(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r != '\'' {
+			out = append(out, r)
+		}
+	}
+	return string(out)
 }

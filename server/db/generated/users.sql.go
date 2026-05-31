@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, name)
 VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, name, avatar_url, email_verified, created_at
+RETURNING id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country
 `
 
 type CreateUserParams struct {
@@ -34,12 +34,21 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.AvatarUrl,
 		&i.EmailVerified,
 		&i.CreatedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.Phone,
+		&i.BirthYear,
+		&i.Gender,
+		&i.StreetAddress,
+		&i.PostalCode,
+		&i.City,
+		&i.Country,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, name, avatar_url, email_verified, created_at FROM users WHERE email = $1
+SELECT id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -53,12 +62,21 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.AvatarUrl,
 		&i.EmailVerified,
 		&i.CreatedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.Phone,
+		&i.BirthYear,
+		&i.Gender,
+		&i.StreetAddress,
+		&i.PostalCode,
+		&i.City,
+		&i.Country,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, name, avatar_url, email_verified, created_at FROM users WHERE id = $1
+SELECT id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -72,8 +90,59 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.AvatarUrl,
 		&i.EmailVerified,
 		&i.CreatedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.Phone,
+		&i.BirthYear,
+		&i.Gender,
+		&i.StreetAddress,
+		&i.PostalCode,
+		&i.City,
+		&i.Country,
 	)
 	return i, err
+}
+
+const listActiveListingsByUser = `-- name: ListActiveListingsByUser :many
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type FROM listings
+WHERE user_id = $1 AND status = 'active'
+  AND created_at > NOW() - INTERVAL '60 days'
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListActiveListingsByUser(ctx context.Context, userID pgtype.UUID) ([]Listing, error) {
+	rows, err := q.db.Query(ctx, listActiveListingsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Listing
+	for rows.Next() {
+		var i Listing
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Title,
+			&i.Description,
+			&i.PriceOre,
+			&i.Category,
+			&i.Subcategory,
+			&i.Condition,
+			&i.County,
+			&i.Municipality,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Status,
+			&i.AdType,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const markEmailVerified = `-- name: MarkEmailVerified :exec
@@ -83,4 +152,73 @@ UPDATE users SET email_verified = true WHERE id = $1
 func (q *Queries) MarkEmailVerified(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, markEmailVerified, id)
 	return err
+}
+
+const updateProfile = `-- name: UpdateProfile :one
+UPDATE users SET
+  name = $2,
+  avatar_url = $3,
+  display_name = $4,
+  bio = $5,
+  phone = $6,
+  birth_year = $7,
+  gender = $8,
+  street_address = $9,
+  postal_code = $10,
+  city = $11,
+  country = $12
+WHERE id = $1
+RETURNING id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country
+`
+
+type UpdateProfileParams struct {
+	ID            pgtype.UUID `json:"id"`
+	Name          string      `json:"name"`
+	AvatarUrl     pgtype.Text `json:"avatar_url"`
+	DisplayName   string      `json:"display_name"`
+	Bio           string      `json:"bio"`
+	Phone         string      `json:"phone"`
+	BirthYear     string      `json:"birth_year"`
+	Gender        string      `json:"gender"`
+	StreetAddress string      `json:"street_address"`
+	PostalCode    string      `json:"postal_code"`
+	City          string      `json:"city"`
+	Country       string      `json:"country"`
+}
+
+func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateProfile,
+		arg.ID,
+		arg.Name,
+		arg.AvatarUrl,
+		arg.DisplayName,
+		arg.Bio,
+		arg.Phone,
+		arg.BirthYear,
+		arg.Gender,
+		arg.StreetAddress,
+		arg.PostalCode,
+		arg.City,
+		arg.Country,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.AvatarUrl,
+		&i.EmailVerified,
+		&i.CreatedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.Phone,
+		&i.BirthYear,
+		&i.Gender,
+		&i.StreetAddress,
+		&i.PostalCode,
+		&i.City,
+		&i.Country,
+	)
+	return i, err
 }
