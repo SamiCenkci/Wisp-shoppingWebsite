@@ -17,9 +17,6 @@ A full-stack secondhand marketplace for the Norwegian market, inspired by [Finn.
 ### Chat — messaging with file sharing
 ![Chat](docs/screenshots/chat.png)
 
-### Dark mode
-![Dark mode](docs/screenshots/dark.png)
-
 ---
 
 ## Overview
