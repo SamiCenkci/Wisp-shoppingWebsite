@@ -29,6 +29,8 @@ export default function Navbar() {
     setMenuOpen(false);
   }, [pathname]);
 
+  
+
   function loadUnread() {
     if (!localStorage.getItem("token")) {
       setUnread(0);
