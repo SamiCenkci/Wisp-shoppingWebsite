@@ -1,4 +1,5 @@
 import ThemeToggle from "@/components/ThemeToggle";
+import Link from "next/link";
 
 export default function Footer() {
   return (
@@ -10,9 +11,9 @@ export default function Footer() {
             <p className="text-sm text-ink-secondary mt-1">Kjøp og selg brukte ting, enkelt og trygt.</p>
           </div>
           <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-sm text-ink-secondary">
-            <span className="hover:text-brand cursor-pointer">Om oss</span>
-            <span className="hover:text-brand cursor-pointer">Hjelp</span>
-            <span className="hover:text-brand cursor-pointer">Personvern</span>
+            <Link href="/om-oss" className="hover:text-brand">Om oss</Link>
+            <Link href="/hjelp" className="hover:text-brand">Hjelp</Link>
+            <Link href="/personvern" className="hover:text-brand">Personvern</Link>
             <ThemeToggle />
           </div>
         </div>
