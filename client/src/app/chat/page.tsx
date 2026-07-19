@@ -79,9 +79,16 @@ function ChatInner() {
 
   useEffect(() => {
     if (!activeId) return;
-    api(`/api/conversations/${activeId}/messages`)
-      .then((data) => setMessages(data ?? []))
-      .catch(() => setMessages([]));
+
+    function loadMessages() {
+      api(`/api/conversations/${activeId}/messages`)
+        .then((data) => setMessages(data ?? []))
+        .catch(() => {});
+    }
+
+    loadMessages(); // load immediately
+    const interval = setInterval(loadMessages, 3000); // then every 3s
+    return () => clearInterval(interval);
   }, [activeId]);
 
   useEffect(() => {
