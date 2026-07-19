@@ -4,52 +4,93 @@ import { useState, useRef, useEffect } from "react";
 
 type Msg = { from: "bot" | "user"; text: string };
 
-// Keyword-matched answers. Each entry: keywords to match + the answer.
+// Each entry: trigger keywords + the answer. Matching is case-insensitive
+// and checks if any keyword appears anywhere in the user's message.
 const KNOWLEDGE: { keywords: string[]; answer: string }[] = [
   {
-    keywords: ["legge ut", "ny annonse", "selge", "publisere", "poste", "legge til"],
+    keywords: ["legg", "legge", "legger", "ny annonse", "selge", "selg", "publiser", "poste", "post", "opprett", "lage annonse", "hvordan selger"],
     answer:
-      "For å legge ut en annonse: logg inn, klikk «+ Ny annonse», fyll ut tittel, beskrivelse og pris, og last opp bilder. Du kan velge om varen selges eller gis bort gratis.",
+      "For å legge ut en annonse: logg inn, klikk «+ Ny annonse» øverst, fyll ut tittel, beskrivelse og pris, og last opp bilder. Du kan velge om varen selges eller gis bort gratis. 📸",
   },
   {
-    keywords: ["kontakt", "melding", "chat", "selger", "snakke", "kjøper"],
+    keywords: ["kontakt", "melding", "meldinger", "chat", "chatte", "selger", "snakke", "kjøper", "kontakte", "svar"],
     answer:
-      "Åpne annonsen og klikk «Send melding til selger» for å starte en samtale. Du finner alle samtalene dine under «Meldinger».",
+      "Åpne annonsen du er interessert i og klikk «Send melding til selger». Da starter en samtale som du finner igjen under «Meldinger» i menyen. 💬",
   },
   {
-    keywords: ["gis bort", "gratis", "giveaway"],
+    keywords: ["gis bort", "gratis", "giveaway", "gi bort", "gi vekk", "free"],
     answer:
-      "Noen annonser er gratis. Da står det «Gis bort» på annonsen, og prisen vises som «Gratis».",
+      "Noen annonser gis bort gratis. Da står det «Gis bort» på annonsen, og prisen vises som «Gratis». Du kan selv velge dette når du lager en annonse.",
   },
   {
-    keywords: ["hvor lenge", "utløper", "aktiv", "60", "slette", "solgt"],
+    keywords: ["hvor lenge", "utløper", "utløp", "aktiv", "60", "varighet", "hvor lang tid"],
     answer:
-      "Annonser er aktive i 60 dager. Du kan når som helst markere en annonse som solgt eller slette den under «Mine annonser».",
+      "Annonser er aktive i 60 dager. Etter det utløper de automatisk, men du kan alltid legge dem ut på nytt.",
   },
   {
-    keywords: ["favoritt", "hjerte", "lagre", "likte", "liker"],
+    keywords: ["slette", "slett", "fjerne", "fjern", "solgt", "marker"],
     answer:
-      "Trykk på hjertet på en annonse for å lagre den. Du finner alle lagrede annonser på profilen din under «Likte annonser».",
+      "Du kan slette en annonse eller markere den som solgt under «Mine annonser». Klikk på ⋮-menyen på annonsen for å velge.",
   },
   {
-    keywords: ["trygt", "sikkerhet", "svindel", "betale", "møte"],
+    keywords: ["favoritt", "favoritter", "hjerte", "lagre", "likte", "liker", "lik", "spare"],
     answer:
-      "Møt gjerne selgeren på et offentlig sted, sjekk varen før du betaler, og vær forsiktig med forskuddsbetaling til ukjente. Bruk sunn fornuft.",
+      "Trykk på hjertet ❤️ på en annonse for å lagre den som favoritt. Du finner alle lagrede annonser på profilen din under «Likte annonser».",
   },
   {
-    keywords: ["søk", "finne", "filtrer", "lete"],
+    keywords: ["trygt", "trygg", "sikkerhet", "sikker", "svindel", "svindler", "betale", "betaling", "møte", "møtes", "lure"],
     answer:
-      "Bruk søkefeltet øverst for å finne annonser. Etter et søk kan du filtrere på kategori, postnummer, pris, tilstand og type.",
+      "For trygg handel: møt selgeren på et offentlig sted, sjekk varen før du betaler, og vær forsiktig med forskuddsbetaling til ukjente. Bruk sunn fornuft, som ved all annen brukthandel. 🔒",
   },
   {
-    keywords: ["konto", "registrere", "logge inn", "passord", "profil"],
+    keywords: ["søk", "søke", "finne", "finn", "filtrer", "filter", "lete", "leter", "kategori"],
     answer:
-      "Klikk «Registrer deg» for å lage en konto, eller «Logg inn» hvis du allerede har en. Du kan redigere profilen din når som helst.",
+      "Bruk søkefeltet øverst for å finne annonser. Etter et søk kan du filtrere på kategori, postnummer, pris, tilstand og type annonse. 🔍",
   },
   {
-    keywords: ["mørk", "lyst", "tema", "dark", "mode"],
+    keywords: ["konto", "registrer", "registrere", "logge inn", "logg inn", "innlogging", "profil", "bruker"],
     answer:
-      "Du kan bytte mellom lyst og mørkt tema med tema-knappen nederst på siden.",
+      "Klikk «Registrer deg» for å lage en konto, eller «Logg inn» hvis du allerede har en. Du kan redigere profilen din når som helst fra «Min profil».",
+  },
+  {
+    keywords: ["passord", "glemt", "endre passord", "resette"],
+    answer:
+      "Passordet ditt lagres kryptert og trygt. Har du problemer med innlogging, dobbeltsjekk e-postadressen og passordet du bruker.",
+  },
+  {
+    keywords: ["mørk", "lyst", "tema", "dark", "light", "mode", "farge", "natt"],
+    answer:
+      "Du kan bytte mellom lyst og mørkt tema med tema-knappen (🌙/☀️) nederst på siden.",
+  },
+  {
+    keywords: ["bilde", "bilder", "bilde opp", "last opp", "laste opp", "foto", "bildene"],
+    answer:
+      "Når du lager en annonse kan du laste opp flere bilder. Gode, tydelige bilder gjør at annonsen selger raskere! 📷",
+  },
+  {
+    keywords: ["pris", "koste", "kostnad", "gebyr", "avgift", "betale for"],
+    answer:
+      "Det er gratis å bruke Wisp – både å legge ut annonser og å bla gjennom. Du bestemmer selv prisen på det du selger.",
+  },
+  {
+    keywords: ["endre", "redigere", "rediger", "oppdatere", "endre annonse"],
+    answer:
+      "Du kan redigere en annonse under «Mine annonser» – klikk på ⋮-menyen og velg «Endre».",
+  },
+  {
+    keywords: ["kategori", "kategorier", "type", "hva kan"],
+    answer:
+      "Du finner annonser i mange kategorier øverst på forsiden. Klikk på en kategori for å se alt innenfor den.",
+  },
+  {
+    keywords: ["hei", "hallo", "heisann", "hjelp", "hjelpe", "spørsmål"],
+    answer:
+      "Hei! Jeg hjelper deg gjerne. Du kan spørre om hvordan du legger ut en annonse, kontakter en selger, lagrer favoritter, søker, eller handler trygt. 😊",
+  },
+  {
+    keywords: ["takk", "tusen takk", "flott", "supert", "bra"],
+    answer:
+      "Bare hyggelig! 😊 Si fra hvis det er noe mer du lurer på.",
   },
 ];
 
@@ -57,24 +98,43 @@ const SUGGESTIONS = [
   "Hvordan legger jeg ut en annonse?",
   "Hvordan kontakter jeg en selger?",
   "Hva betyr «Gis bort»?",
+  "Hvordan lagrer jeg favoritter?",
   "Er det trygt å handle her?",
+  "Koster det noe å bruke Wisp?",
 ];
 
 function findAnswer(input: string): string {
   const text = input.toLowerCase();
   for (const entry of KNOWLEDGE) {
-    if (entry.keywords.some((k) => text.includes(k))) {
+    if (entry.keywords.some((k) => text.includes(k.toLowerCase()))) {
       return entry.answer;
     }
   }
-  return "Beklager, det er jeg ikke sikker på. Prøv å spørre om hvordan du legger ut en annonse, kontakter en selger, eller lagrer favoritter. Du finner mer på Hjelp-siden.";
+  return "Beklager, det er jeg ikke sikker på. 🤔 Prøv å spørre om annonser, meldinger, favoritter, søk eller trygg handel – eller se Hjelp-siden for mer.";
 }
 
 export default function ChatBot() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([
-    { from: "bot", text: "Hei! 👋 Jeg er Wisp-hjelperen. Hva lurer du på?" },
-  ]);
+  const WELCOME: Msg = { from: "bot", text: "Hei! 👋 Jeg er Wisp-hjelperen. Hva lurer du på?" };
+  const [messages, setMessages] = useState<Msg[]>([WELCOME]);
+
+  // Load saved history on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("wispChatHistory");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
+      }
+    } catch {}
+  }, []);
+
+  // Save history whenever messages change
+  useEffect(() => {
+    try {
+      localStorage.setItem("wispChatHistory", JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -87,15 +147,21 @@ export default function ChatBot() {
     if (!q) return;
     setMessages((prev) => [...prev, { from: "user", text: q }]);
     setInput("");
-    // Small delay so it feels like it's "thinking"
     setTimeout(() => {
       setMessages((prev) => [...prev, { from: "bot", text: findAnswer(q) }]);
     }, 350);
   }
 
+  function reset() {
+    setMessages([WELCOME]);
+    setInput("");
+    try {
+      localStorage.removeItem("wispChatHistory");
+    } catch {}
+  }
+
   return (
     <>
-      {/* Floating button */}
       <button
         onClick={() => setOpen((o) => !o)}
         className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-brand text-white shadow-lg flex items-center justify-center text-2xl hover:bg-brand-dark transition-transform hover:scale-105"
@@ -104,11 +170,18 @@ export default function ChatBot() {
         {open ? "✕" : "💬"}
       </button>
 
-      {/* Chat window */}
       {open && (
         <div className="fixed bottom-24 right-5 z-50 w-[90vw] max-w-sm h-[70vh] max-h-[500px] bg-surface border border-line rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-          <div className="bg-brand text-white px-4 py-3 font-semibold shrink-0">
-            Wisp-hjelperen
+          <div className="bg-brand text-white px-4 py-3 font-semibold shrink-0 flex items-center justify-between">
+            <span>Wisp-hjelperen</span>
+            {messages.length > 1 && (
+              <button
+                onClick={reset}
+                className="text-xs bg-white/20 hover:bg-white/30 rounded-lg px-2 py-1"
+              >
+                ← Tilbake
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -126,7 +199,6 @@ export default function ChatBot() {
               </div>
             ))}
 
-            {/* Suggested questions (only show at start) */}
             {messages.length <= 1 && (
               <div className="space-y-2 pt-2">
                 {SUGGESTIONS.map((s) => (
