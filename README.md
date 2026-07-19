@@ -9,10 +9,10 @@ A full-stack secondhand marketplace for the Norwegian market, inspired by [Finn.
 ## 📸 Screenshots
 
 ### Homepage — browse and search listings
-![Homepage](Screenshots/Screenshot1.png)
+![Homepage](Screenshots/Screenshot2.png)
 
 ### Listing detail — gallery, seller info, and favorites
-![Listing detail](Screenshots/Screenshot2.png)
+![Listing detail](Screenshots/Screenshot1.png)
 
 ### Chat — messaging with file sharing
 ![Chat](Screenshots/Screenshot3.png)
