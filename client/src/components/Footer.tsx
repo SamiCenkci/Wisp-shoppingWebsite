@@ -18,7 +18,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="border-t border-line mt-8 pt-6 text-xs text-ink-muted text-center">
-          © {new Date().getFullYear()} Wisp. Laget med Next.js og Go.
+          © {new Date().getFullYear()} Wisp
         </div>
       </div>
     </footer>
