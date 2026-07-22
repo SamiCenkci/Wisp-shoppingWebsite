@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { expiryLabel } from "@/lib/expiry";
+import dynamic from "next/dynamic";
+
+const ListingMap = dynamic(() => import("@/components/ListingMap"), { ssr: false });
 
 const conditionLabels: Record<string, string> = {
   new: "Ny",
@@ -28,6 +31,9 @@ type Listing = {
   sold_to?: string;
   view_count?: number;
   images?: Image[];
+  latitude?: number;
+  longitude?: number;
+  street_address?: string;
 };
 type Seller = {
   id: string;
@@ -226,6 +232,16 @@ export default function ListingDetailPage() {
             <p>⏱ {expiryLabel(listing.created_at)}</p>
             <p>👁 {listing.view_count ?? 0} visninger</p>
           </div>
+          {listing.latitude && listing.longitude ? (
+            <div className="mt-5">
+              <p className="text-sm font-medium text-ink mb-2">Omtrentlig område</p>
+              <ListingMap
+                latitude={listing.latitude}
+                longitude={listing.longitude}
+                label={`${listing.municipality}, ${listing.county}`}
+              />
+            </div>
+          ) : null}
 
           {isOwn ? (
             <div className="mt-6 space-y-3">

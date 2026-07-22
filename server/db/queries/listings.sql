@@ -1,6 +1,6 @@
 -- name: CreateListing :one
-INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type, street_address, latitude, longitude)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
 
 -- name: GetListingByID :one
@@ -22,6 +22,7 @@ ORDER BY created_at DESC;
 UPDATE listings
 SET title = $2, description = $3, price_ore = $4, category = $5,
     subcategory = $6, condition = $7, county = $8, municipality = $9,
+    street_address = $10, latitude = $11, longitude = $12,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
@@ -40,8 +41,8 @@ LIMIT 4;
 -- name: UpdateListingStatus :exec
 UPDATE listings SET status = $2 WHERE id = $1;
 
--- name: IncrementViewCount :exec
-UPDATE listings SET view_count = view_count + 1 WHERE id = $1;
-
 -- name: MarkListingSold :exec
 UPDATE listings SET status = 'sold', sold_to = $2 WHERE id = $1;
+
+-- name: IncrementViewCount :exec
+UPDATE listings SET view_count = view_count + 1 WHERE id = $1;

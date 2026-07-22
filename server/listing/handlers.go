@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -19,19 +20,20 @@ type Handler struct {
 	Email   *email.Sender
 }
 
-
-
 type createRequest struct {
-	Title        string   `json:"title" binding:"required"`
-	Description  string   `json:"description" binding:"required"`
-	PriceOre     int32    `json:"price_ore" binding:"required,min=0"`
-	Category     string   `json:"category" binding:"required"`
-	Subcategory  string   `json:"subcategory"`
-	Condition    string   `json:"condition" binding:"required"`
-	County       string   `json:"county" binding:"required"`
-	Municipality string   `json:"municipality" binding:"required"`
-	AdType       string   `json:"ad_type"`
-	Images       []string `json:"images"`
+	Title         string   `json:"title" binding:"required"`
+	Description   string   `json:"description" binding:"required"`
+	PriceOre      int32    `json:"price_ore" binding:"required,min=0"`
+	Category      string   `json:"category" binding:"required"`
+	Subcategory   string   `json:"subcategory"`
+	Condition     string   `json:"condition" binding:"required"`
+	County        string   `json:"county" binding:"required"`
+	Municipality  string   `json:"municipality" binding:"required"`
+	AdType        string   `json:"ad_type"`
+	StreetAddress string   `json:"street_address"`
+	Latitude      float64  `json:"latitude"`
+	Longitude     float64  `json:"longitude"`
+	Images        []string `json:"images"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -54,16 +56,19 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	listing, err := h.Queries.CreateListing(context.Background(), db.CreateListingParams{
-		UserID:       pgUUID(userID),
-		Title:        req.Title,
-		Description:  req.Description,
-		PriceOre:     req.PriceOre,
-		Category:     req.Category,
-		Subcategory:  pgText(req.Subcategory),
-		Condition:    req.Condition,
-		County:       req.County,
-		Municipality: req.Municipality,
-		AdType:       adType,
+		UserID:        pgUUID(userID),
+		Title:         req.Title,
+		Description:   req.Description,
+		PriceOre:      req.PriceOre,
+		Category:      req.Category,
+		Subcategory:   pgText(req.Subcategory),
+		Condition:     req.Condition,
+		County:        req.County,
+		Municipality:  req.Municipality,
+		AdType:        adType,
+		StreetAddress: req.StreetAddress,
+		Latitude:      pgFloat8(req.Latitude),
+		Longitude:     pgFloat8(req.Longitude),
 	})
 
 	if err != nil {
@@ -129,10 +134,10 @@ func (h *Handler) GetOne(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
 	}
-	
+
 	// Count this view (fire-and-forget; don't block on errors)
 	_ = h.Queries.IncrementViewCount(context.Background(), listing.ID)
-	listing.ViewCount = listing.ViewCount + 1 // reflect the increment in this response
+	listing.ViewCount = listing.ViewCount + 1
 
 	images, _ := h.Queries.GetImagesByListing(context.Background(), listing.ID)
 
@@ -210,15 +215,18 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 
 	updated, err := h.Queries.UpdateListing(context.Background(), db.UpdateListingParams{
-		ID:           pgUUID(id),
-		Title:        req.Title,
-		Description:  req.Description,
-		PriceOre:     req.PriceOre,
-		Category:     req.Category,
-		Subcategory:  pgText(req.Subcategory),
-		Condition:    req.Condition,
-		County:       req.County,
-		Municipality: req.Municipality,
+		ID:            pgUUID(id),
+		Title:         req.Title,
+		Description:   req.Description,
+		PriceOre:      req.PriceOre,
+		Category:      req.Category,
+		Subcategory:   pgText(req.Subcategory),
+		Condition:     req.Condition,
+		County:        req.County,
+		Municipality:  req.Municipality,
+		StreetAddress: req.StreetAddress,
+		Latitude:      pgFloat8(req.Latitude),
+		Longitude:     pgFloat8(req.Longitude),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -447,6 +455,14 @@ func sanitize(s string) string {
 	return string(out)
 }
 
+// pgFloat8 wraps a float64, treating 0 as "not set".
+func pgFloat8(f float64) pgtype.Float8 {
+	if f == 0 {
+		return pgtype.Float8{Valid: false}
+	}
+	return pgtype.Float8{Float64: f, Valid: true}
+}
+
 // likedSet returns the set of listing IDs the given user has favorited.
 // Returns an empty set if userID is empty (logged out).
 func (h *Handler) likedSet(c *gin.Context) map[string]bool {
@@ -468,4 +484,3 @@ func (h *Handler) likedSet(c *gin.Context) map[string]bool {
 	}
 	return set
 }
-

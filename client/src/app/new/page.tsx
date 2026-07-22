@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
+import AddressAutocomplete, { SelectedAddress } from "@/components/AddressAutocomplete";
 
 export default function NewListingPage() {
   const router = useRouter();
@@ -13,9 +14,13 @@ export default function NewListingPage() {
     price: "",
     category: CATEGORIES[0],
     condition: "good",
-    postal_code: "",
     ad_type: "sale",
+    street_address: "",
+    postal_code: "",
+    city: "",
+    county: "",
   });
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -23,6 +28,17 @@ export default function NewListingPage() {
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function onAddressSelect(addr: SelectedAddress) {
+    setForm((prev) => ({
+      ...prev,
+      street_address: addr.street,
+      postal_code: addr.postalCode,
+      city: addr.city,
+      county: addr.county,
+    }));
+    setCoords({ lat: addr.latitude, lon: addr.longitude });
   }
 
   function onFilesChange(selected: File[]) {
@@ -43,6 +59,10 @@ export default function NewListingPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!form.postal_code) {
+      setError("Velg en adresse fra listen så postnummer fylles ut automatisk.");
+      return;
+    }
     setLoading(true);
     try {
       const imageUrls: string[] = [];
@@ -55,9 +75,12 @@ export default function NewListingPage() {
           price_ore: form.ad_type === "giveaway" ? 0 : Math.round(parseFloat(form.price || "0") * 100),
           category: form.category,
           condition: form.condition,
-          county: "Norge",
-          municipality: form.postal_code,
+          county: form.county || "Norge",
+          municipality: form.city || form.postal_code,
           ad_type: form.ad_type,
+          street_address: form.street_address,
+          latitude: coords?.lat ?? 0,
+          longitude: coords?.lon ?? 0,
           images: imageUrls,
         }),
       });
@@ -77,7 +100,6 @@ export default function NewListingPage() {
       <h1 className="text-2xl font-semibold mb-6 text-ink">Legg ut ny annonse</h1>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: images */}
         <div className="lg:col-span-1">
           <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm lg:sticky lg:top-24">
             <label className={labelClass}>Bilder</label>
@@ -100,16 +122,15 @@ export default function NewListingPage() {
                 ))}
               </div>
             )}
-            {files.length > 0 && (
-              <p className="text-xs text-ink-muted mt-2">{files.length} bilde(r) valgt</p>
-            )}
+            {files.length > 0 && <p className="text-xs text-ink-muted mt-2">{files.length} bilde(r) valgt</p>}
           </div>
         </div>
 
-        {/* Right: details */}
         <div className="lg:col-span-2">
           <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm space-y-4">
-            {error && <p className="text-red-600 text-sm">{error}</p>}
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+            )}
 
             <div>
               <label className={labelClass}>Type annonse</label>
@@ -149,6 +170,27 @@ export default function NewListingPage() {
               <textarea value={form.description} onChange={(e) => update("description", e.target.value)} required rows={5} className={inputClass} placeholder="Beskriv varen din..." />
             </div>
 
+            <div>
+              <label className={labelClass}>Adresse</label>
+              <AddressAutocomplete
+                value={form.street_address}
+                onChange={(v) => update("street_address", v)}
+                onSelect={onAddressSelect}
+                placeholder="Begynn å skrive adressen..."
+                className={inputClass}
+              />
+              {form.postal_code ? (
+                <p className="text-xs text-brand mt-1.5">
+                  ✓ {form.postal_code} {form.city}
+                  {form.county ? ` · ${form.county}` : ""}
+                </p>
+              ) : (
+                <p className="text-xs text-ink-muted mt-1.5">
+                  Velg en adresse fra listen — postnummer og poststed fylles ut automatisk.
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {form.ad_type === "sale" && (
                 <div>
@@ -185,10 +227,6 @@ export default function NewListingPage() {
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className={labelClass}>Postnummer</label>
-                <input value={form.postal_code} onChange={(e) => update("postal_code", e.target.value)} required maxLength={4} className={inputClass} placeholder="f.eks. 0150" />
               </div>
             </div>
 

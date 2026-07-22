@@ -12,22 +12,25 @@ import (
 )
 
 const createListing = `-- name: CreateListing :one
-INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to
+INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type, street_address, latitude, longitude)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address
 `
 
 type CreateListingParams struct {
-	UserID       pgtype.UUID `json:"user_id"`
-	Title        string      `json:"title"`
-	Description  string      `json:"description"`
-	PriceOre     int32       `json:"price_ore"`
-	Category     string      `json:"category"`
-	Subcategory  pgtype.Text `json:"subcategory"`
-	Condition    string      `json:"condition"`
-	County       string      `json:"county"`
-	Municipality string      `json:"municipality"`
-	AdType       string      `json:"ad_type"`
+	UserID        pgtype.UUID   `json:"user_id"`
+	Title         string        `json:"title"`
+	Description   string        `json:"description"`
+	PriceOre      int32         `json:"price_ore"`
+	Category      string        `json:"category"`
+	Subcategory   pgtype.Text   `json:"subcategory"`
+	Condition     string        `json:"condition"`
+	County        string        `json:"county"`
+	Municipality  string        `json:"municipality"`
+	AdType        string        `json:"ad_type"`
+	StreetAddress string        `json:"street_address"`
+	Latitude      pgtype.Float8 `json:"latitude"`
+	Longitude     pgtype.Float8 `json:"longitude"`
 }
 
 func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (Listing, error) {
@@ -42,6 +45,9 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		arg.County,
 		arg.Municipality,
 		arg.AdType,
+		arg.StreetAddress,
+		arg.Latitude,
+		arg.Longitude,
 	)
 	var i Listing
 	err := row.Scan(
@@ -61,6 +67,9 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		&i.AdType,
 		&i.ViewCount,
 		&i.SoldTo,
+		&i.Latitude,
+		&i.Longitude,
+		&i.StreetAddress,
 	)
 	return i, err
 }
@@ -75,7 +84,7 @@ func (q *Queries) DeleteListing(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getListingByID = `-- name: GetListingByID :one
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to FROM listings WHERE id = $1
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address FROM listings WHERE id = $1
 `
 
 func (q *Queries) GetListingByID(ctx context.Context, id pgtype.UUID) (Listing, error) {
@@ -98,12 +107,15 @@ func (q *Queries) GetListingByID(ctx context.Context, id pgtype.UUID) (Listing, 
 		&i.AdType,
 		&i.ViewCount,
 		&i.SoldTo,
+		&i.Latitude,
+		&i.Longitude,
+		&i.StreetAddress,
 	)
 	return i, err
 }
 
 const getSimilarListings = `-- name: GetSimilarListings :many
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to FROM listings
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address FROM listings
 WHERE category = $1 AND id != $2
   AND status = 'active'
   AND created_at > NOW() - INTERVAL '60 days'
@@ -142,6 +154,9 @@ func (q *Queries) GetSimilarListings(ctx context.Context, arg GetSimilarListings
 			&i.AdType,
 			&i.ViewCount,
 			&i.SoldTo,
+			&i.Latitude,
+			&i.Longitude,
+			&i.StreetAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -163,7 +178,7 @@ func (q *Queries) IncrementViewCount(ctx context.Context, id pgtype.UUID) error 
 }
 
 const listListings = `-- name: ListListings :many
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to FROM listings
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address FROM listings
 WHERE status = 'active'
   AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC
@@ -201,6 +216,9 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 			&i.AdType,
 			&i.ViewCount,
 			&i.SoldTo,
+			&i.Latitude,
+			&i.Longitude,
+			&i.StreetAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -213,7 +231,7 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 }
 
 const listListingsByUser = `-- name: ListListingsByUser :many
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to FROM listings
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address FROM listings
 WHERE user_id = $1
 ORDER BY created_at DESC
 `
@@ -244,6 +262,9 @@ func (q *Queries) ListListingsByUser(ctx context.Context, userID pgtype.UUID) ([
 			&i.AdType,
 			&i.ViewCount,
 			&i.SoldTo,
+			&i.Latitude,
+			&i.Longitude,
+			&i.StreetAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -273,21 +294,25 @@ const updateListing = `-- name: UpdateListing :one
 UPDATE listings
 SET title = $2, description = $3, price_ore = $4, category = $5,
     subcategory = $6, condition = $7, county = $8, municipality = $9,
+    street_address = $10, latitude = $11, longitude = $12,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to
+RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address
 `
 
 type UpdateListingParams struct {
-	ID           pgtype.UUID `json:"id"`
-	Title        string      `json:"title"`
-	Description  string      `json:"description"`
-	PriceOre     int32       `json:"price_ore"`
-	Category     string      `json:"category"`
-	Subcategory  pgtype.Text `json:"subcategory"`
-	Condition    string      `json:"condition"`
-	County       string      `json:"county"`
-	Municipality string      `json:"municipality"`
+	ID            pgtype.UUID   `json:"id"`
+	Title         string        `json:"title"`
+	Description   string        `json:"description"`
+	PriceOre      int32         `json:"price_ore"`
+	Category      string        `json:"category"`
+	Subcategory   pgtype.Text   `json:"subcategory"`
+	Condition     string        `json:"condition"`
+	County        string        `json:"county"`
+	Municipality  string        `json:"municipality"`
+	StreetAddress string        `json:"street_address"`
+	Latitude      pgtype.Float8 `json:"latitude"`
+	Longitude     pgtype.Float8 `json:"longitude"`
 }
 
 func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (Listing, error) {
@@ -301,6 +326,9 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (L
 		arg.Condition,
 		arg.County,
 		arg.Municipality,
+		arg.StreetAddress,
+		arg.Latitude,
+		arg.Longitude,
 	)
 	var i Listing
 	err := row.Scan(
@@ -320,6 +348,9 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (L
 		&i.AdType,
 		&i.ViewCount,
 		&i.SoldTo,
+		&i.Latitude,
+		&i.Longitude,
+		&i.StreetAddress,
 	)
 	return i, err
 }

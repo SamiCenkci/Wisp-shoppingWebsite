@@ -104,7 +104,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 }
 
 const listActiveListingsByUser = `-- name: ListActiveListingsByUser :many
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to FROM listings
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address FROM listings
 WHERE user_id = $1 AND status = 'active'
   AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC
@@ -136,6 +136,9 @@ func (q *Queries) ListActiveListingsByUser(ctx context.Context, userID pgtype.UU
 			&i.AdType,
 			&i.ViewCount,
 			&i.SoldTo,
+			&i.Latitude,
+			&i.Longitude,
+			&i.StreetAddress,
 		); err != nil {
 			return nil, err
 		}
