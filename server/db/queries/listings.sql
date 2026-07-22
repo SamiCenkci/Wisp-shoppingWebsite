@@ -1,6 +1,6 @@
 -- name: CreateListing :one
-INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type, street_address, latitude, longitude)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type, street_address, postal_code, latitude, longitude)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: GetListingByID :one
@@ -22,7 +22,7 @@ ORDER BY created_at DESC;
 UPDATE listings
 SET title = $2, description = $3, price_ore = $4, category = $5,
     subcategory = $6, condition = $7, county = $8, municipality = $9,
-    street_address = $10, latitude = $11, longitude = $12,
+    street_address = $10, postal_code = $11, latitude = $12, longitude = $13,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
