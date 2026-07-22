@@ -71,6 +71,8 @@ type Review struct {
 	AsDescribed    int32              `json:"as_described"`
 	Comment        string             `json:"comment"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	Reply          string             `json:"reply"`
+	RepliedAt      pgtype.Timestamptz `json:"replied_at"`
 }
 
 type Token struct {

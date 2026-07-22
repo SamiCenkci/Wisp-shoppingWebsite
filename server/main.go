@@ -95,6 +95,11 @@ func main() {
 		api.POST("/reviews", auth.RequireAuth(cfg.JWTSecret), listingHandler.CreateReview)
 		api.GET("/users/:id/reviews", listingHandler.UserReviews)
 		api.GET("/listings/:id/buyers", auth.RequireAuth(cfg.JWTSecret), listingHandler.ListingBuyers)
+
+		api.DELETE("/reviews/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.DeleteReview)
+		api.POST("/reviews/:id/reply", auth.RequireAuth(cfg.JWTSecret), listingHandler.ReplyToReview)
+		api.GET("/reviews/given", auth.RequireAuth(cfg.JWTSecret), listingHandler.MyGivenReviews)
+		api.GET("/listings/:id/can-review", auth.RequireAuth(cfg.JWTSecret), listingHandler.CanReview)
 	}
 
 	router.Run(":" + cfg.Port)

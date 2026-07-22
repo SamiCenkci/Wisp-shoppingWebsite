@@ -228,3 +228,131 @@ func (h *Handler) ListingBuyers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, buyers)
 }
+
+// DELETE /api/reviews/:id — delete a review you wrote
+func (h *Handler) DeleteReview(c *gin.Context) {
+	userID, err := uuid.Parse(c.GetString("userID"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
+		return
+	}
+	reviewID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	// The query itself only deletes when reviewer_id matches, so this is safe.
+	if err := h.Queries.DeleteReview(context.Background(), db.DeleteReviewParams{
+		ID:         pgUUID(reviewID),
+		ReviewerID: pgUUID(userID),
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "vurdering slettet"})
+}
+
+type replyRequest struct {
+	Reply string `json:"reply" binding:"required"`
+}
+
+// POST /api/reviews/:id/reply — reply to a review written about you
+func (h *Handler) ReplyToReview(c *gin.Context) {
+	userID, err := uuid.Parse(c.GetString("userID"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
+		return
+	}
+	reviewID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req replyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	review, err := h.Queries.GetReviewByID(context.Background(), pgUUID(reviewID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "vurdering ikke funnet"})
+		return
+	}
+	if review.ReviewedUserID.Bytes != [16]byte(userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "du kan kun svare på vurderinger om deg"})
+		return
+	}
+	if review.Reply != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "du har allerede svart"})
+		return
+	}
+
+	if err := h.Queries.ReplyToReview(context.Background(), db.ReplyToReviewParams{
+		ID:             pgUUID(reviewID),
+		ReviewedUserID: pgUUID(userID),
+		Reply:          req.Reply,
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "svar lagret"})
+}
+
+// GET /api/reviews/given — reviews the logged-in user has written
+func (h *Handler) MyGivenReviews(c *gin.Context) {
+	userID, err := uuid.Parse(c.GetString("userID"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
+		return
+	}
+
+	reviews, err := h.Queries.ListReviewsByReviewer(context.Background(), pgUUID(userID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if reviews == nil {
+		reviews = []db.ListReviewsByReviewerRow{}
+	}
+
+	c.JSON(http.StatusOK, reviews)
+}
+
+// GET /api/listings/:id/can-review — whether the current user may review this sale
+func (h *Handler) CanReview(c *gin.Context) {
+	userID, err := uuid.Parse(c.GetString("userID"))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"can_review": false})
+		return
+	}
+	listingID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"can_review": false})
+		return
+	}
+
+	listing, err := h.Queries.GetListingByID(context.Background(), pgUUID(listingID))
+	if err != nil || listing.Status != "sold" || !listing.SoldTo.Valid {
+		c.JSON(http.StatusOK, gin.H{"can_review": false})
+		return
+	}
+
+	sellerID := uuid.UUID(listing.UserID.Bytes)
+	buyerID := uuid.UUID(listing.SoldTo.Bytes)
+	if userID != sellerID && userID != buyerID {
+		c.JSON(http.StatusOK, gin.H{"can_review": false})
+		return
+	}
+
+	already, _ := h.Queries.HasReviewed(context.Background(), db.HasReviewedParams{
+		ListingID:  pgUUID(listingID),
+		ReviewerID: pgUUID(userID),
+	})
+
+	c.JSON(http.StatusOK, gin.H{"can_review": !already})
+}

@@ -14,7 +14,7 @@ import (
 const createReview = `-- name: CreateReview :one
 INSERT INTO reviews (listing_id, reviewer_id, reviewed_user_id, communication, reliability, as_described, comment)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, listing_id, reviewer_id, reviewed_user_id, communication, reliability, as_described, comment, created_at
+RETURNING id, listing_id, reviewer_id, reviewed_user_id, communication, reliability, as_described, comment, created_at, reply, replied_at
 `
 
 type CreateReviewParams struct {
@@ -48,6 +48,45 @@ func (q *Queries) CreateReview(ctx context.Context, arg CreateReviewParams) (Rev
 		&i.AsDescribed,
 		&i.Comment,
 		&i.CreatedAt,
+		&i.Reply,
+		&i.RepliedAt,
+	)
+	return i, err
+}
+
+const deleteReview = `-- name: DeleteReview :exec
+DELETE FROM reviews WHERE id = $1 AND reviewer_id = $2
+`
+
+type DeleteReviewParams struct {
+	ID         pgtype.UUID `json:"id"`
+	ReviewerID pgtype.UUID `json:"reviewer_id"`
+}
+
+func (q *Queries) DeleteReview(ctx context.Context, arg DeleteReviewParams) error {
+	_, err := q.db.Exec(ctx, deleteReview, arg.ID, arg.ReviewerID)
+	return err
+}
+
+const getReviewByID = `-- name: GetReviewByID :one
+SELECT id, listing_id, reviewer_id, reviewed_user_id, communication, reliability, as_described, comment, created_at, reply, replied_at FROM reviews WHERE id = $1
+`
+
+func (q *Queries) GetReviewByID(ctx context.Context, id pgtype.UUID) (Review, error) {
+	row := q.db.QueryRow(ctx, getReviewByID, id)
+	var i Review
+	err := row.Scan(
+		&i.ID,
+		&i.ListingID,
+		&i.ReviewerID,
+		&i.ReviewedUserID,
+		&i.Communication,
+		&i.Reliability,
+		&i.AsDescribed,
+		&i.Comment,
+		&i.CreatedAt,
+		&i.Reply,
+		&i.RepliedAt,
 	)
 	return i, err
 }
@@ -90,8 +129,69 @@ func (q *Queries) HasReviewed(ctx context.Context, arg HasReviewedParams) (bool,
 	return exists, err
 }
 
+const listReviewsByReviewer = `-- name: ListReviewsByReviewer :many
+SELECT r.id, r.listing_id, r.reviewer_id, r.reviewed_user_id, r.communication, r.reliability, r.as_described, r.comment, r.created_at, r.reply, r.replied_at, u.name AS reviewed_name, u.display_name AS reviewed_display_name, l.title AS listing_title
+FROM reviews r
+JOIN users u ON u.id = r.reviewed_user_id
+JOIN listings l ON l.id = r.listing_id
+WHERE r.reviewer_id = $1
+ORDER BY r.created_at DESC
+`
+
+type ListReviewsByReviewerRow struct {
+	ID                  pgtype.UUID        `json:"id"`
+	ListingID           pgtype.UUID        `json:"listing_id"`
+	ReviewerID          pgtype.UUID        `json:"reviewer_id"`
+	ReviewedUserID      pgtype.UUID        `json:"reviewed_user_id"`
+	Communication       int32              `json:"communication"`
+	Reliability         int32              `json:"reliability"`
+	AsDescribed         int32              `json:"as_described"`
+	Comment             string             `json:"comment"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	Reply               string             `json:"reply"`
+	RepliedAt           pgtype.Timestamptz `json:"replied_at"`
+	ReviewedName        string             `json:"reviewed_name"`
+	ReviewedDisplayName string             `json:"reviewed_display_name"`
+	ListingTitle        string             `json:"listing_title"`
+}
+
+func (q *Queries) ListReviewsByReviewer(ctx context.Context, reviewerID pgtype.UUID) ([]ListReviewsByReviewerRow, error) {
+	rows, err := q.db.Query(ctx, listReviewsByReviewer, reviewerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReviewsByReviewerRow
+	for rows.Next() {
+		var i ListReviewsByReviewerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ListingID,
+			&i.ReviewerID,
+			&i.ReviewedUserID,
+			&i.Communication,
+			&i.Reliability,
+			&i.AsDescribed,
+			&i.Comment,
+			&i.CreatedAt,
+			&i.Reply,
+			&i.RepliedAt,
+			&i.ReviewedName,
+			&i.ReviewedDisplayName,
+			&i.ListingTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReviewsForUser = `-- name: ListReviewsForUser :many
-SELECT r.id, r.listing_id, r.reviewer_id, r.reviewed_user_id, r.communication, r.reliability, r.as_described, r.comment, r.created_at, u.name AS reviewer_name, u.display_name AS reviewer_display_name, l.title AS listing_title
+SELECT r.id, r.listing_id, r.reviewer_id, r.reviewed_user_id, r.communication, r.reliability, r.as_described, r.comment, r.created_at, r.reply, r.replied_at, u.name AS reviewer_name, u.display_name AS reviewer_display_name, l.title AS listing_title
 FROM reviews r
 JOIN users u ON u.id = r.reviewer_id
 JOIN listings l ON l.id = r.listing_id
@@ -109,6 +209,8 @@ type ListReviewsForUserRow struct {
 	AsDescribed         int32              `json:"as_described"`
 	Comment             string             `json:"comment"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	Reply               string             `json:"reply"`
+	RepliedAt           pgtype.Timestamptz `json:"replied_at"`
 	ReviewerName        string             `json:"reviewer_name"`
 	ReviewerDisplayName string             `json:"reviewer_display_name"`
 	ListingTitle        string             `json:"listing_title"`
@@ -133,6 +235,8 @@ func (q *Queries) ListReviewsForUser(ctx context.Context, reviewedUserID pgtype.
 			&i.AsDescribed,
 			&i.Comment,
 			&i.CreatedAt,
+			&i.Reply,
+			&i.RepliedAt,
 			&i.ReviewerName,
 			&i.ReviewerDisplayName,
 			&i.ListingTitle,
@@ -145,4 +249,20 @@ func (q *Queries) ListReviewsForUser(ctx context.Context, reviewedUserID pgtype.
 		return nil, err
 	}
 	return items, nil
+}
+
+const replyToReview = `-- name: ReplyToReview :exec
+UPDATE reviews SET reply = $3, replied_at = NOW()
+WHERE id = $1 AND reviewed_user_id = $2
+`
+
+type ReplyToReviewParams struct {
+	ID             pgtype.UUID `json:"id"`
+	ReviewedUserID pgtype.UUID `json:"reviewed_user_id"`
+	Reply          string      `json:"reply"`
+}
+
+func (q *Queries) ReplyToReview(ctx context.Context, arg ReplyToReviewParams) error {
+	_, err := q.db.Exec(ctx, replyToReview, arg.ID, arg.ReviewedUserID, arg.Reply)
+	return err
 }

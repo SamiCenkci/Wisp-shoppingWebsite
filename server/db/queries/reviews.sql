@@ -22,3 +22,21 @@ WHERE reviewed_user_id = $1;
 SELECT EXISTS (
   SELECT 1 FROM reviews WHERE listing_id = $1 AND reviewer_id = $2
 );
+
+-- name: GetReviewByID :one
+SELECT * FROM reviews WHERE id = $1;
+
+-- name: DeleteReview :exec
+DELETE FROM reviews WHERE id = $1 AND reviewer_id = $2;
+
+-- name: ReplyToReview :exec
+UPDATE reviews SET reply = $3, replied_at = NOW()
+WHERE id = $1 AND reviewed_user_id = $2;
+
+-- name: ListReviewsByReviewer :many
+SELECT r.*, u.name AS reviewed_name, u.display_name AS reviewed_display_name, l.title AS listing_title
+FROM reviews r
+JOIN users u ON u.id = r.reviewed_user_id
+JOIN listings l ON l.id = r.listing_id
+WHERE r.reviewer_id = $1
+ORDER BY r.created_at DESC;
