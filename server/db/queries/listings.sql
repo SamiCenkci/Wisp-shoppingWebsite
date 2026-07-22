@@ -39,3 +39,6 @@ LIMIT 4;
 
 -- name: UpdateListingStatus :exec
 UPDATE listings SET status = $2 WHERE id = $1;
+
+-- name: IncrementViewCount :exec
+UPDATE listings SET view_count = view_count + 1 WHERE id = $1;

@@ -125,6 +125,10 @@ func (h *Handler) GetOne(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
 	}
+	
+	// Count this view (fire-and-forget; don't block on errors)
+	_ = h.Queries.IncrementViewCount(context.Background(), listing.ID)
+	listing.ViewCount = listing.ViewCount + 1 // reflect the increment in this response
 
 	images, _ := h.Queries.GetImagesByListing(context.Background(), listing.ID)
 

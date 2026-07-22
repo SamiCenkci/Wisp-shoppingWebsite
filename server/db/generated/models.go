@@ -38,6 +38,7 @@ type Listing struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	Status       string             `json:"status"`
 	AdType       string             `json:"ad_type"`
+	ViewCount    int32              `json:"view_count"`
 }
 
 type ListingImage struct {
