@@ -83,6 +83,11 @@ func main() {
 		api.POST("/listings/:id/favorite", auth.RequireAuth(cfg.JWTSecret), listingHandler.AddFavorite)
 		api.DELETE("/listings/:id/favorite", auth.RequireAuth(cfg.JWTSecret), listingHandler.RemoveFavorite)
 		api.GET("/users/:id/favorites", auth.RequireAuth(cfg.JWTSecret), listingHandler.MyFavorites)
+
+		api.PUT("/listings/:id/sold", auth.RequireAuth(cfg.JWTSecret), listingHandler.MarkSold)
+		api.POST("/reviews", auth.RequireAuth(cfg.JWTSecret), listingHandler.CreateReview)
+		api.GET("/users/:id/reviews", listingHandler.UserReviews)
+		api.GET("/listings/:id/buyers", auth.RequireAuth(cfg.JWTSecret), listingHandler.ListingBuyers)
 	}
 
 	router.Run(":" + cfg.Port)

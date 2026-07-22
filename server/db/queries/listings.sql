@@ -42,3 +42,6 @@ UPDATE listings SET status = $2 WHERE id = $1;
 
 -- name: IncrementViewCount :exec
 UPDATE listings SET view_count = view_count + 1 WHERE id = $1;
+
+-- name: MarkListingSold :exec
+UPDATE listings SET status = 'sold', sold_to = $2 WHERE id = $1;

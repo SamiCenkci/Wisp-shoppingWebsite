@@ -16,6 +16,7 @@ type Listing = {
   created_at: string;
   images?: Image[];
 };
+type Buyer = { id: string; name: string; display_name: string };
 
 const TABS = [
   { key: "all", label: "Alle" },
@@ -38,6 +39,9 @@ export default function MyListingsPage() {
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [soldModal, setSoldModal] = useState<{ listingId: string; title: string } | null>(null);
+  const [buyers, setBuyers] = useState<Buyer[]>([]);
+  const [loadingBuyers, setLoadingBuyers] = useState(false);
 
   function load() {
     api("/api/listings/mine")
@@ -80,6 +84,35 @@ export default function MyListingsPage() {
     }
   }
 
+  async function openSoldModal(listingId: string, title: string) {
+    setSoldModal({ listingId, title });
+    setLoadingBuyers(true);
+    try {
+      const data = await api(`/api/listings/${listingId}/buyers`);
+      setBuyers(data ?? []);
+    } catch {
+      setBuyers([]);
+    } finally {
+      setLoadingBuyers(false);
+    }
+  }
+
+  async function confirmSold(buyerId: string) {
+    if (!soldModal) return;
+    try {
+      await api(`/api/listings/${soldModal.listingId}/sold`, {
+        method: "PUT",
+        body: JSON.stringify({ buyer_id: buyerId }),
+      });
+      setListings((prev) =>
+        prev.map((l) => (l.id === soldModal.listingId ? { ...l, status: "sold" } : l))
+      );
+      setSoldModal(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Kunne ikke markere som solgt");
+    }
+  }
+
   const filtered = listings.filter((l) => {
     const matchesTab = tab === "all" || l.status === tab;
     const matchesSearch = l.title.toLowerCase().includes(search.toLowerCase());
@@ -93,7 +126,6 @@ export default function MyListingsPage() {
 
   return (
     <main className="max-w-[1400px] mx-auto px-[5%] py-8 flex flex-col lg:flex-row gap-8">
-      {/* Left sidebar — tabs + search */}
       <aside className="lg:w-72 shrink-0">
         <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm lg:sticky lg:top-24">
           <div className="flex items-center justify-between mb-4">
@@ -131,7 +163,6 @@ export default function MyListingsPage() {
         </div>
       </aside>
 
-      {/* Right — listings */}
       <section className="flex-1">
         {loading ? (
           <p className="text-ink-secondary">Laster...</p>
@@ -190,18 +221,26 @@ export default function MyListingsPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   {listing.status !== "sold" ? (
                     <button
-                      onClick={() => setStatus(listing.id, "sold")}
+                      onClick={() => openSoldModal(listing.id, listing.title)}
                       className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand whitespace-nowrap"
                     >
                       Marker solgt
                     </button>
                   ) : (
-                    <button
-                      onClick={() => setStatus(listing.id, "active")}
-                      className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand whitespace-nowrap"
-                    >
-                      Aktiver
-                    </button>
+                    <>
+                      <button
+                        onClick={() => router.push(`/review/${listing.id}`)}
+                        className="px-3.5 py-2 rounded-xl bg-brand text-white text-sm hover:bg-brand-dark whitespace-nowrap"
+                      >
+                        Gi vurdering
+                      </button>
+                      <button
+                        onClick={() => setStatus(listing.id, "active")}
+                        className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand whitespace-nowrap"
+                      >
+                        Aktiver
+                      </button>
+                    </>
                   )}
 
                   <div className="relative">
@@ -248,6 +287,51 @@ export default function MyListingsPage() {
           </div>
         )}
       </section>
+
+      {soldModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setSoldModal(null)}
+        >
+          <div
+            className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-ink mb-1">Hvem solgte du til?</h2>
+            <p className="text-sm text-ink-secondary mb-5">{soldModal.title}</p>
+
+            {loadingBuyers ? (
+              <p className="text-ink-secondary text-sm py-4">Laster...</p>
+            ) : buyers.length === 0 ? (
+              <p className="text-ink-secondary text-sm py-4">
+                Ingen har sendt melding om denne annonsen ennå, så det er ingen kjøper å velge.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {buyers.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => confirmSold(b.id)}
+                    className="w-full text-left px-4 py-3 rounded-xl border border-line hover:border-brand hover:bg-subtle flex items-center gap-3"
+                  >
+                    <span className="w-9 h-9 rounded-full bg-brand-lightest text-brand flex items-center justify-center font-bold shrink-0">
+                      {(b.display_name || b.name).charAt(0).toUpperCase()}
+                    </span>
+                    <span className="text-ink font-medium">{b.display_name || b.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setSoldModal(null)}
+              className="mt-5 w-full py-2.5 rounded-xl border border-line text-ink-secondary hover:text-ink"
+            >
+              Avbryt
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -39,6 +39,7 @@ type Listing struct {
 	Status       string             `json:"status"`
 	AdType       string             `json:"ad_type"`
 	ViewCount    int32              `json:"view_count"`
+	SoldTo       pgtype.UUID        `json:"sold_to"`
 }
 
 type ListingImage struct {
@@ -58,6 +59,18 @@ type Message struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	AttachmentUrl  string             `json:"attachment_url"`
 	AttachmentName string             `json:"attachment_name"`
+}
+
+type Review struct {
+	ID             pgtype.UUID        `json:"id"`
+	ListingID      pgtype.UUID        `json:"listing_id"`
+	ReviewerID     pgtype.UUID        `json:"reviewer_id"`
+	ReviewedUserID pgtype.UUID        `json:"reviewed_user_id"`
+	Communication  int32              `json:"communication"`
+	Reliability    int32              `json:"reliability"`
+	AsDescribed    int32              `json:"as_described"`
+	Comment        string             `json:"comment"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type Token struct {

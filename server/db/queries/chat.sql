@@ -41,3 +41,9 @@ SELECT COUNT(*) FROM messages
 WHERE conversation_id = $1
   AND sender_id != $2
   AND read_at IS NULL;
+
+-- name: ListBuyersForListing :many
+SELECT DISTINCT u.id, u.name, u.display_name
+FROM conversations c
+JOIN users u ON u.id = c.buyer_id
+WHERE c.listing_id = $1;

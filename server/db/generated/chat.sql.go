@@ -124,6 +124,39 @@ func (q *Queries) GetOrCreateConversation(ctx context.Context, arg GetOrCreateCo
 	return i, err
 }
 
+const listBuyersForListing = `-- name: ListBuyersForListing :many
+SELECT DISTINCT u.id, u.name, u.display_name
+FROM conversations c
+JOIN users u ON u.id = c.buyer_id
+WHERE c.listing_id = $1
+`
+
+type ListBuyersForListingRow struct {
+	ID          pgtype.UUID `json:"id"`
+	Name        string      `json:"name"`
+	DisplayName string      `json:"display_name"`
+}
+
+func (q *Queries) ListBuyersForListing(ctx context.Context, listingID pgtype.UUID) ([]ListBuyersForListingRow, error) {
+	rows, err := q.db.Query(ctx, listBuyersForListing, listingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBuyersForListingRow
+	for rows.Next() {
+		var i ListBuyersForListingRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.DisplayName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listConversationsForUser = `-- name: ListConversationsForUser :many
 SELECT id, listing_id, buyer_id, seller_id, updated_at FROM conversations
 WHERE buyer_id = $1 OR seller_id = $1

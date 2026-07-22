@@ -25,6 +25,8 @@ type Listing = {
   created_at: string;
   status: string;
   ad_type?: string;
+  sold_to?: string;
+  view_count?: number;
   images?: Image[];
 };
 type Seller = {
@@ -43,6 +45,7 @@ export default function ListingDetailPage() {
   const [similar, setSimilar] = useState<Listing[]>([]);
   const [seller, setSeller] = useState<Seller | null>(null);
   const [isOwn, setIsOwn] = useState(false);
+  const [canReview, setCanReview] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [liked, setLiked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -63,6 +66,9 @@ export default function ListingDetailPage() {
           try {
             const me = JSON.parse(stored);
             setIsOwn(me.id === data.seller.id);
+            const soldTo = data.listing?.sold_to;
+            const isSold = data.listing?.status === "sold";
+            setCanReview(Boolean(isSold && soldTo && (me.id === soldTo || me.id === data.seller.id)));
           } catch {}
         }
         window.scrollTo(0, 0);
@@ -171,6 +177,7 @@ export default function ListingDetailPage() {
           <div className="mt-5 pt-5 border-t border-line text-sm text-ink-secondary space-y-1">
             <p>📍 {listing.municipality}, {listing.county}</p>
             <p>⏱ {expiryLabel(listing.created_at)}</p>
+            <p>👁 {listing.view_count ?? 0} visninger</p>
           </div>
 
           {isOwn ? (
@@ -184,6 +191,15 @@ export default function ListingDetailPage() {
               className="mt-6 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {listing.status === "active" ? "Send melding til selger" : "Ikke tilgjengelig"}
+            </button>
+          )}
+
+          {canReview && (
+            <button
+              onClick={() => router.push(`/review/${listing.id}`)}
+              className="mt-3 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark"
+            >
+              Gi vurdering
             </button>
           )}
 
