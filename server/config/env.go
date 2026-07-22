@@ -17,6 +17,7 @@ type Config struct {
 	AWSSecretAccessKey string
 	S3Bucket           string
 	AllowedOrigins     []string
+	ResendAPIKey       string
 }
 
 func Load() *Config {
@@ -53,6 +54,7 @@ func Load() *Config {
 		AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
 		S3Bucket:           os.Getenv("S3_BUCKET"),
 		AllowedOrigins:     originList,
+		ResendAPIKey:       os.Getenv("RESEND_API_KEY"),
 	}
 	if cfg.DatabaseURL == "" {
 		log.Fatal("DATABASE_URL is not set in .env")

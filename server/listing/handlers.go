@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/email"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,7 +16,10 @@ import (
 type Handler struct {
 	Queries *db.Queries
 	Pool    *pgxpool.Pool
+	Email   *email.Sender
 }
+
+
 
 type createRequest struct {
 	Title        string   `json:"title" binding:"required"`
@@ -464,3 +468,4 @@ func (h *Handler) likedSet(c *gin.Context) map[string]bool {
 	}
 	return set
 }
+

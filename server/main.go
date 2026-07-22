@@ -6,6 +6,7 @@ import (
 	"github.com/SamiCenkci/Shopping-Website/config"
 	"github.com/SamiCenkci/Shopping-Website/db"
 	dbgen "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/email"
 	"github.com/SamiCenkci/Shopping-Website/listing"
 	"github.com/SamiCenkci/Shopping-Website/upload"
 	"github.com/SamiCenkci/Shopping-Website/user"
@@ -25,7 +26,12 @@ func main() {
 		JWTSecret: cfg.JWTSecret,
 	}
 
-	listingHandler := &listing.Handler{Queries: queries, Pool: pool}
+	mailer := &email.Sender{
+		APIKey:  cfg.ResendAPIKey,
+		SiteURL: "https://wispapp.net",
+	}
+
+	listingHandler := &listing.Handler{Queries: queries, Pool: pool, Email: mailer}
 
 	uploadHandler := &upload.Handler{
 		Region:    cfg.AWSRegion,
@@ -80,6 +86,7 @@ func main() {
 		api.GET("/messages/unread-count", auth.RequireAuth(cfg.JWTSecret), chatHandler.UnreadCount)
 		api.POST("/conversations/:id/messages", auth.RequireAuth(cfg.JWTSecret), chatHandler.Send)
 		api.GET("/ws", auth.RequireAuthWS(cfg.JWTSecret), chatHandler.WebSocket)
+
 		api.POST("/listings/:id/favorite", auth.RequireAuth(cfg.JWTSecret), listingHandler.AddFavorite)
 		api.DELETE("/listings/:id/favorite", auth.RequireAuth(cfg.JWTSecret), listingHandler.RemoveFavorite)
 		api.GET("/users/:id/favorites", auth.RequireAuth(cfg.JWTSecret), listingHandler.MyFavorites)
