@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import StarRating from "@/components/StarRating";
 
 type Image = { id: string; url: string };
 type Listing = {
@@ -24,6 +25,17 @@ type Profile = {
   city: string;
   created_at: string;
 };
+type Review = {
+  id: string;
+  reviewer_name: string;
+  reviewer_display_name: string;
+  listing_title: string;
+  communication: number;
+  reliability: number;
+  as_described: number;
+  comment: string;
+  created_at: string;
+};
 
 export default function ProfilePage() {
   const params = useParams();
@@ -33,6 +45,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [isOwn, setIsOwn] = useState(false);
   const [favorites, setFavorites] = useState<Listing[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
     api(`/api/users/${params.id}`)
@@ -54,6 +69,15 @@ export default function ProfilePage() {
       .finally(() => setLoading(false));
   }, [params.id]);
 
+  useEffect(() => {
+    api(`/api/users/${params.id}/reviews`)
+      .then((data) => {
+        setReviews(data.reviews ?? []);
+        setReviewCount(Number(data.review_count ?? 0));
+        setAvgRating(Number(data.average_rating ?? 0));
+      })
+      .catch(() => {});
+  }, [params.id]);
 
   useEffect(() => {
     if (!isOwn) {
@@ -73,7 +97,6 @@ export default function ProfilePage() {
 
   return (
     <main className="max-w-[1400px] mx-auto px-[5%] py-8 flex flex-col lg:flex-row gap-8">
-      {/* Left sidebar — profile card */}
       <aside className="lg:w-80 shrink-0">
         <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm lg:sticky lg:top-24">
           <div className="flex flex-col items-center text-center">
@@ -86,6 +109,16 @@ export default function ProfilePage() {
             </div>
             <h1 className="text-xl font-bold text-ink mt-4">{displayName}</h1>
             <p className="text-sm text-ink-secondary mt-1">Medlem siden {memberSince}</p>
+
+            {reviewCount > 0 && (
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <StarRating value={Math.round(avgRating)} readOnly size="sm" />
+                <p className="text-sm text-ink-secondary">
+                  <span className="font-semibold text-ink">{avgRating.toFixed(1)}</span> av 5 · {reviewCount}{" "}
+                  {reviewCount === 1 ? "vurdering" : "vurderinger"}
+                </p>
+              </div>
+            )}
 
             {isOwn && (
               <button
@@ -125,7 +158,6 @@ export default function ProfilePage() {
         </div>
       </aside>
 
-      {/* Right — listings grid */}
       <section className="flex-1">
         <h2 className="text-xl font-semibold text-ink mb-5">
           Aktive annonser <span className="text-ink-muted font-normal text-base">({listings.length})</span>
@@ -161,6 +193,7 @@ export default function ProfilePage() {
             ))}
           </div>
         )}
+
         {isOwn && favorites.length > 0 && (
           <div className="mt-12">
             <h2 className="text-xl font-semibold text-ink mb-5">Likte annonser</h2>
@@ -190,6 +223,66 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold text-ink mb-5">
+            Vurderinger <span className="text-ink-muted font-normal text-base">({reviewCount})</span>
+          </h2>
+
+          {reviews.length === 0 ? (
+            <div className="bg-surface border border-line rounded-2xl p-10 text-center">
+              <p className="text-ink-secondary">Ingen vurderinger ennå.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((r) => {
+                const avg = (r.communication + r.reliability + r.as_described) / 3;
+                const reviewer = r.reviewer_display_name || r.reviewer_name;
+                return (
+                  <div key={r.id} className="bg-surface border border-line rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <span className="w-10 h-10 rounded-full bg-brand-lightest text-brand flex items-center justify-center font-bold shrink-0">
+                          {reviewer.charAt(0).toUpperCase()}
+                        </span>
+                        <div>
+                          <p className="font-medium text-ink">{reviewer}</p>
+                          <p className="text-xs text-ink-muted">
+                            {r.listing_title} ·{" "}
+                            {new Date(r.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "short", day: "numeric" })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StarRating value={Math.round(avg)} readOnly size="sm" />
+                        <span className="font-semibold text-ink text-sm">{avg.toFixed(1)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Kommunikasjon</span>
+                        <StarRating value={r.communication} readOnly size="sm" />
+                      </div>
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Pålitelighet</span>
+                        <StarRating value={r.reliability} readOnly size="sm" />
+                      </div>
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Som beskrevet</span>
+                        <StarRating value={r.as_described} readOnly size="sm" />
+                      </div>
+                    </div>
+
+                    {r.comment && (
+                      <p className="mt-4 pt-4 border-t border-line text-ink whitespace-pre-wrap">{r.comment}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </section>
     </main>
   );
