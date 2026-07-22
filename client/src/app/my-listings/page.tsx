@@ -44,6 +44,7 @@ export default function MyListingsPage() {
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [loadingBuyers, setLoadingBuyers] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [reviewable, setReviewable] = useState<Record<string, boolean>>({});
 
   function load() {
     api("/api/listings/mine")
@@ -63,6 +64,18 @@ export default function MyListingsPage() {
     window.addEventListener("click", closeOnOutside);
     return () => window.removeEventListener("click", closeOnOutside);
   }, []);
+
+  useEffect(() => {
+    const sold = listings.filter((l) => l.status === "sold");
+    if (sold.length === 0) return;
+    Promise.all(
+      sold.map((l) =>
+        api(`/api/listings/${l.id}/can-review`)
+          .then((d) => [l.id, Boolean(d.can_review)] as const)
+          .catch(() => [l.id, false] as const)
+      )
+    ).then((pairs) => setReviewable(Object.fromEntries(pairs)));
+  }, [listings]);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -232,12 +245,14 @@ export default function MyListingsPage() {
                     </button>
                   ) : (
                     <>
-                      <button
-                        onClick={() => router.push(`/review/${listing.id}`)}
-                        className="px-3.5 py-2 rounded-xl bg-brand text-white text-sm hover:bg-brand-dark whitespace-nowrap"
-                      >
-                        Gi vurdering
-                      </button>
+                      {reviewable[listing.id] && (
+                        <button
+                          onClick={() => router.push(`/review/${listing.id}`)}
+                          className="px-3.5 py-2 rounded-xl bg-brand text-white text-sm hover:bg-brand-dark whitespace-nowrap"
+                        >
+                          Gi vurdering
+                        </button>
+                      )}
                       <button
                         onClick={() => setStatus(listing.id, "active")}
                         className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand whitespace-nowrap"

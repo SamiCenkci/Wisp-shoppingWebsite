@@ -68,9 +68,19 @@ export default function ListingDetailPage() {
         try {
           const me = JSON.parse(stored);
           setIsOwn(me.id === data.seller.id);
-          const soldTo = data.listing?.sold_to;
-          const isSold = data.listing?.status === "sold";
-          setCanReview(Boolean(isSold && soldTo && (me.id === soldTo || me.id === data.seller.id)));
+          useEffect(() => {
+    if (!listing || listing.status !== "sold") {
+      setCanReview(false);
+      return;
+    }
+    if (!localStorage.getItem("token")) {
+      setCanReview(false);
+      return;
+    }
+    api(`/api/listings/${listing.id}/can-review`)
+      .then((data) => setCanReview(Boolean(data.can_review)))
+      .catch(() => setCanReview(false));
+  }, [listing]);
         } catch {}
       }
       return data;
