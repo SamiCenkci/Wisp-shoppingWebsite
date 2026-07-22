@@ -3,261 +3,289 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { expiryLabel } from "@/lib/expiry";
-
-const conditionLabels: Record<string, string> = {
-  new: "Ny",
-  like_new: "Som ny",
-  good: "God",
-  fair: "Brukbar",
-};
+import StarRating from "@/components/StarRating";
 
 type Image = { id: string; url: string };
 type Listing = {
   id: string;
   title: string;
-  description: string;
   price_ore: number;
   category: string;
-  condition: string;
-  county: string;
   municipality: string;
-  created_at: string;
-  status: string;
-  ad_type?: string;
-  sold_to?: string;
-  view_count?: number;
+  county: string;
   images?: Image[];
 };
-type Seller = {
+type Profile = {
   id: string;
   name: string;
   display_name: string;
   avatar_url: string;
+  bio: string;
+  phone: string;
+  city: string;
+  created_at: string;
+};
+type Review = {
+  id: string;
+  reviewer_name: string;
+  reviewer_display_name: string;
+  listing_title: string;
+  communication: number;
+  reliability: number;
+  as_described: number;
+  comment: string;
   created_at: string;
 };
 
-export default function ListingDetailPage() {
+export default function ProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [images, setImages] = useState<Image[]>([]);
-  const [similar, setSimilar] = useState<Listing[]>([]);
-  const [seller, setSeller] = useState<Seller | null>(null);
-  const [isOwn, setIsOwn] = useState(false);
-  const [canReview, setCanReview] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [liked, setLiked] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [isOwn, setIsOwn] = useState(false);
+  const [favorites, setFavorites] = useState<Listing[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
-    setLoading(true);
-    api(`/api/listings/${params.id}`)
+    api(`/api/users/${params.id}`)
       .then((data) => {
-        setListing(data.listing);
-        setImages(data.images ?? []);
-        setSimilar(data.similar ?? []);
-        setSeller(data.seller ?? null);
-        setLikeCount(data.like_count ?? 0);
-        setLiked(data.liked_by_me ?? false);
+        setProfile(data.user);
+        setListings(data.listings ?? []);
+        const token = localStorage.getItem("token");
         const stored = localStorage.getItem("user");
-        if (stored && data.seller) {
+        if (token && stored) {
           try {
             const me = JSON.parse(stored);
-            setIsOwn(me.id === data.seller.id);
-            const soldTo = data.listing?.sold_to;
-            const isSold = data.listing?.status === "sold";
-            setCanReview(Boolean(isSold && soldTo && (me.id === soldTo || me.id === data.seller.id)));
+            setIsOwn(me.id === data.user.id);
           } catch {}
+        } else {
+          setIsOwn(false);
         }
-        window.scrollTo(0, 0);
       })
-      .catch((err) => setError(err.message))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [params.id]);
 
-  async function toggleLike() {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
+  useEffect(() => {
+    api(`/api/users/${params.id}/reviews`)
+      .then((data) => {
+        setReviews(data.reviews ?? []);
+        setReviewCount(Number(data.review_count ?? 0));
+        setAvgRating(Number(data.average_rating ?? 0));
+      })
+      .catch(() => {});
+  }, [params.id]);
+
+  useEffect(() => {
+    if (!isOwn) {
+      setFavorites([]);
       return;
     }
-    if (!listing) return;
-    try {
-      await api(`/api/listings/${listing.id}/favorite`, {
-        method: liked ? "DELETE" : "POST",
-      });
-      const data = await api(`/api/listings/${listing.id}`);
-      setLikeCount(data.like_count ?? 0);
-      setLiked(data.liked_by_me ?? false);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke oppdatere");
-    }
-  }
+    api(`/api/users/${params.id}/favorites`)
+      .then((data) => setFavorites(data ?? []))
+      .catch(() => setFavorites([]));
+  }, [isOwn, params.id]);
 
-  async function startConversation() {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    if (!seller || !listing) return;
-    try {
-      const conv = await api("/api/conversations", {
-        method: "POST",
-        body: JSON.stringify({ listing_id: listing.id, seller_id: seller.id }),
-      });
-      router.push(`/chat?c=${conv.id}`);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke starte samtale");
-    }
-  }
+  if (loading) return <p className="max-w-[1400px] mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
+  if (!profile) return <p className="max-w-[1400px] mx-auto px-[5%] py-10">Bruker ikke funnet.</p>;
 
-  if (loading) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
-  if (error) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-red-600">{error}</p>;
-  if (!listing) return <p className="max-w-3xl mx-auto px-[5%] py-10">Annonse ikke funnet.</p>;
+  const memberSince = new Date(profile.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "long" });
+  const displayName = profile.display_name || profile.name;
 
   return (
-    <main className="max-w-[1100px] mx-auto px-[5%] py-8">
-      <button onClick={() => router.push("/")} className="text-brand text-sm mb-4 hover:underline">
-        ← Tilbake til annonser
-      </button>
-      {listing.status !== "active" && (
-        <div className="mb-4 rounded-xl bg-subtle border border-line px-4 py-3 text-sm text-ink-secondary">
-          {listing.status === "sold"
-            ? "Denne annonsen er markert som solgt og er ikke lenger aktiv."
-            : "Denne annonsen er utløpt og er ikke lenger aktiv."}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div>
-          {images.length > 0 ? (
-            <div className="space-y-2">
-              <img src={images[0].url} alt={listing.title} className="w-full h-80 object-cover rounded-2xl" />
-              {images.length > 1 && (
-                <div className="grid grid-cols-4 gap-2">
-                  {images.slice(1).map((img) => (
-                    <img key={img.id} src={img.url} alt={listing.title} className="w-full h-20 object-cover rounded-lg" />
-                  ))}
-                </div>
+    <main className="max-w-[1400px] mx-auto px-[5%] py-8 flex flex-col lg:flex-row gap-8">
+      {/* Left sidebar — profile card */}
+      <aside className="lg:w-80 shrink-0">
+        <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm lg:sticky lg:top-24">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-28 h-28 rounded-full bg-brand-lightest overflow-hidden flex items-center justify-center">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-brand text-4xl font-bold">{displayName.charAt(0).toUpperCase()}</span>
               )}
             </div>
-          ) : (
-            <div className="w-full h-80 rounded-2xl bg-subtle flex items-center justify-center text-ink-muted">
-              Ingen bilde
-            </div>
-          )}
-        </div>
+            <h1 className="text-xl font-bold text-ink mt-4">{displayName}</h1>
+            <p className="text-sm text-ink-secondary mt-1">Medlem siden {memberSince}</p>
 
-        <div className="lg:sticky lg:top-24 self-start">
-          <h1 className="text-3xl font-bold text-ink">{listing.title}</h1>
-          <p className="text-3xl text-brand font-bold mt-3">
-            {listing.ad_type === "giveaway" ? "Gratis" : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
-          </p>
-
-          <button
-            onClick={toggleLike}
-            className={`mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
-              liked
-                ? "border-brand bg-brand-lightest text-brand"
-                : "border-line text-ink-secondary hover:border-brand hover:text-brand"
-            }`}
-          >
-            <span>{liked ? "❤️" : "🤍"}</span>
-            <span>{likeCount} liker</span>
-          </button>
-
-          <div className="flex gap-2 mt-4 text-sm">
-            <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{listing.category}</span>
-            <span className="bg-subtle text-ink-secondary rounded-full px-3 py-1">{conditionLabels[listing.condition] ?? listing.condition}</span>
-          </div>
-          <p className="mt-5 text-ink whitespace-pre-wrap">{listing.description}</p>
-          <div className="mt-5 pt-5 border-t border-line text-sm text-ink-secondary space-y-1">
-            <p>📍 {listing.municipality}, {listing.county}</p>
-            <p>⏱ {expiryLabel(listing.created_at)}</p>
-            <p>👁 {listing.view_count ?? 0} visninger</p>
-          </div>
-
-          {isOwn ? (
-            <div className="mt-6 w-full bg-subtle text-ink-muted rounded-lg py-3 font-medium text-center border border-line">
-              Dette er din egen annonse
-            </div>
-          ) : (
-            <button
-              disabled={listing.status !== "active"}
-              onClick={startConversation}
-              className="mt-6 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {listing.status === "active" ? "Send melding til selger" : "Ikke tilgjengelig"}
-            </button>
-          )}
-
-          {canReview && (
-            <button
-              onClick={() => router.push(`/review/${listing.id}`)}
-              className="mt-3 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark"
-            >
-              Gi vurdering
-            </button>
-          )}
-
-          {seller && (
-            <div
-              onClick={() => router.push(`/profile/${seller.id}`)}
-              className="mt-6 flex items-center gap-3 p-4 rounded-xl border border-line bg-surface cursor-pointer hover:border-brand transition-colors"
-            >
-              <div className="w-12 h-12 rounded-full bg-brand-lightest overflow-hidden flex items-center justify-center shrink-0">
-                {seller.avatar_url ? (
-                  <img src={seller.avatar_url} alt={seller.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-brand font-bold">
-                    {(seller.display_name || seller.name).charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-ink">{seller.display_name || seller.name}</p>
-                <p className="text-xs text-ink-secondary">
-                  Medlem siden{" "}
-                  {new Date(seller.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "long" })}
+            {reviewCount > 0 && (
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <StarRating value={Math.round(avgRating)} readOnly size="sm" />
+                <p className="text-sm text-ink-secondary">
+                  <span className="font-semibold text-ink">{avgRating.toFixed(1)}</span> av 5 · {reviewCount}{" "}
+                  {reviewCount === 1 ? "vurdering" : "vurderinger"}
                 </p>
               </div>
-              <span className="text-brand text-sm">Se profil →</span>
+            )}
+
+            {isOwn && (
+              <button
+                onClick={() => router.push("/profile/edit")}
+                className="mt-4 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
+              >
+                Rediger profil
+              </button>
+            )}
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-line space-y-3 text-sm">
+            <div className="flex items-center gap-2 text-ink-secondary">
+              <span className="text-ink-muted">📋</span>
+              <span>{listings.length} aktive annonser</span>
+            </div>
+            {profile.city && (
+              <div className="flex items-center gap-2 text-ink-secondary">
+                <span className="text-ink-muted">📍</span>
+                <span>{profile.city}</span>
+              </div>
+            )}
+            {profile.phone && (
+              <div className="flex items-center gap-2 text-ink-secondary">
+                <span className="text-ink-muted">📞</span>
+                <span>{profile.phone}</span>
+              </div>
+            )}
+          </div>
+
+          {profile.bio && (
+            <div className="mt-6 pt-6 border-t border-line">
+              <h2 className="text-sm font-semibold text-ink mb-2">Om {displayName}</h2>
+              <p className="text-sm text-ink-secondary whitespace-pre-wrap leading-relaxed">{profile.bio}</p>
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
-      {similar.length > 0 && (
-        <section className="mt-12">
-          <h2 className="text-xl font-semibold text-ink mb-5">Lignende annonser</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-            {similar.map((s) => (
+      {/* Right — listings, favorites, reviews */}
+      <section className="flex-1">
+        <h2 className="text-xl font-semibold text-ink mb-5">
+          Aktive annonser <span className="text-ink-muted font-normal text-base">({listings.length})</span>
+        </h2>
+
+        {listings.length === 0 ? (
+          <div className="bg-surface border border-line rounded-2xl p-16 text-center">
+            <p className="text-ink-secondary">Ingen aktive annonser.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            {listings.map((listing) => (
               <div
-                key={s.id}
-                onClick={() => router.push(`/listings/${s.id}`)}
-                className="group cursor-pointer rounded-2xl overflow-hidden border border-line bg-surface shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
+                key={listing.id}
+                onClick={() => router.push(`/listings/${listing.id}`)}
+                className="group cursor-pointer rounded-2xl overflow-hidden border border-line bg-surface shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
               >
-                <div className="h-36 w-full overflow-hidden bg-subtle">
-                  {s.images && s.images.length > 0 ? (
-                    <img src={s.images[0].url} alt={s.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <div className="h-44 w-full overflow-hidden bg-subtle">
+                  {listing.images && listing.images.length > 0 ? (
+                    <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted">Ingen bilde</div>
+                    <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
                   )}
                 </div>
-                <div className="p-3">
-                  <h3 className="font-medium text-sm truncate text-ink">{s.title}</h3>
-                  <p className="font-semibold text-ink mt-0.5">
-                    {s.ad_type === "giveaway" ? "Gratis" : `${(s.price_ore / 100).toLocaleString("nb-NO")} kr`}
+                <div className="p-4">
+                  <h3 className="font-medium truncate text-ink">{listing.title}</h3>
+                  <p className="font-semibold mt-1 text-lg text-ink">
+                    {(listing.price_ore / 100).toLocaleString("nb-NO")} kr
                   </p>
+                  <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}</p>
                 </div>
               </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
+
+        {isOwn && favorites.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-xl font-semibold text-ink mb-5">Likte annonser</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {favorites.map((listing) => (
+                <div
+                  key={listing.id}
+                  onClick={() => router.push(`/listings/${listing.id}`)}
+                  className="group cursor-pointer rounded-2xl overflow-hidden border border-line bg-surface shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="h-40 w-full overflow-hidden bg-subtle">
+                    {listing.images && listing.images.length > 0 ? (
+                      <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium truncate text-ink">{listing.title}</h3>
+                    <p className="font-semibold mt-1 text-lg text-ink">
+                      {(listing.price_ore / 100).toLocaleString("nb-NO")} kr
+                    </p>
+                    <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold text-ink mb-5">
+            Vurderinger <span className="text-ink-muted font-normal text-base">({reviewCount})</span>
+          </h2>
+
+          {reviews.length === 0 ? (
+            <div className="bg-surface border border-line rounded-2xl p-10 text-center">
+              <p className="text-ink-secondary">Ingen vurderinger ennå.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((r) => {
+                const avg = (r.communication + r.reliability + r.as_described) / 3;
+                const reviewer = r.reviewer_display_name || r.reviewer_name;
+                return (
+                  <div key={r.id} className="bg-surface border border-line rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <span className="w-10 h-10 rounded-full bg-brand-lightest text-brand flex items-center justify-center font-bold shrink-0">
+                          {reviewer.charAt(0).toUpperCase()}
+                        </span>
+                        <div>
+                          <p className="font-medium text-ink">{reviewer}</p>
+                          <p className="text-xs text-ink-muted">
+                            {r.listing_title} ·{" "}
+                            {new Date(r.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "short", day: "numeric" })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StarRating value={Math.round(avg)} readOnly size="sm" />
+                        <span className="font-semibold text-ink text-sm">{avg.toFixed(1)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Kommunikasjon</span>
+                        <StarRating value={r.communication} readOnly size="sm" />
+                      </div>
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Pålitelighet</span>
+                        <StarRating value={r.reliability} readOnly size="sm" />
+                      </div>
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Som beskrevet</span>
+                        <StarRating value={r.as_described} readOnly size="sm" />
+                      </div>
+                    </div>
+
+                    {r.comment && (
+                      <p className="mt-4 pt-4 border-t border-line text-ink whitespace-pre-wrap">{r.comment}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
     </main>
   );
 }
