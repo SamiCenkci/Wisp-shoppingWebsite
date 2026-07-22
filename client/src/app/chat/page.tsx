@@ -40,6 +40,7 @@ function ChatInner() {
   const [myId, setMyId] = useState("");
   const [attachment, setAttachment] = useState<{ url: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [canReview, setCanReview] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -62,7 +63,6 @@ function ChatInner() {
 
   function openConversation(id: string) {
     setActiveId(id);
-    // Optimistically clear this conversation's unread badge
     setConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c))
     );
@@ -86,10 +86,22 @@ function ChatInner() {
         .catch(() => {});
     }
 
-    loadMessages(); // load immediately
-    const interval = setInterval(loadMessages, 3000); // then every 3s
+    loadMessages();
+    const interval = setInterval(loadMessages, 3000);
     return () => clearInterval(interval);
   }, [activeId]);
+
+  // Can the current user still leave a review for this sale?
+  useEffect(() => {
+    const conv = conversations.find((c) => c.id === activeId);
+    if (!conv) {
+      setCanReview(false);
+      return;
+    }
+    api(`/api/listings/${conv.listing_id}/can-review`)
+      .then((data) => setCanReview(Boolean(data.can_review)))
+      .catch(() => setCanReview(false));
+  }, [activeId, conversations]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -115,10 +127,6 @@ function ChatInner() {
     return () => ws.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -244,10 +252,21 @@ function ChatInner() {
                       <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted">—</div>
                     )}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-ink truncate">{active.other_name || "Bruker"}</p>
                     <p className="text-sm text-ink-secondary truncate">{active.listing_title}</p>
                   </div>
+                  {canReview && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/review/${active.listing_id}`);
+                      }}
+                      className="shrink-0 px-3.5 py-2 rounded-xl bg-brand text-white text-sm font-medium hover:bg-brand-dark whitespace-nowrap"
+                    >
+                      Gi vurdering
+                    </button>
+                  )}
                 </div>
               )}
 
