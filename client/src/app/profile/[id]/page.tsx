@@ -6,6 +6,14 @@ import { api } from "@/lib/api";
 
 const currentYear = new Date().getFullYear();
 
+// 8 digits -> "123 45 678"
+function formatPhone(digits: string) {
+  const d = digits.slice(0, 8);
+  if (d.length <= 3) return d;
+  if (d.length <= 5) return `${d.slice(0, 3)} ${d.slice(3)}`;
+  return `${d.slice(0, 3)} ${d.slice(3, 5)} ${d.slice(5)}`;
+}
+
 export default function EditProfilePage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -13,7 +21,6 @@ export default function EditProfilePage() {
     name: "",
     display_name: "",
     bio: "",
-    phone: "",
     birth_year: "",
     gender: "",
     street_address: "",
@@ -21,6 +28,7 @@ export default function EditProfilePage() {
     city: "",
     country: "Norge",
   });
+  const [phoneDigits, setPhoneDigits] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -33,6 +41,10 @@ export default function EditProfilePage() {
         const me = JSON.parse(stored);
         setForm((prev) => ({ ...prev, name: me.name ?? "", display_name: me.display_name ?? "" }));
         setAvatarUrl(me.avatar_url ?? "");
+        if (me.phone) {
+          const d = String(me.phone).replace(/\D/g, "");
+          setPhoneDigits(d.length > 8 && d.startsWith("47") ? d.slice(2, 10) : d.slice(0, 8));
+        }
       } catch {}
     }
   }, []);
@@ -41,11 +53,9 @@ export default function EditProfilePage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  // Keep only digits (and an optional leading +) for phone numbers
-  function updatePhone(value: string) {
-    const plus = value.startsWith("+") ? "+" : "";
-    const digits = value.replace(/\D/g, "").slice(0, 15);
-    update("phone", plus + digits);
+  // Names: letters, spaces, hyphens and apostrophes only — no digits
+  function updateName(field: string, value: string, maxLen: number) {
+    update(field, value.replace(/[0-9]/g, "").slice(0, maxLen));
   }
 
   // Digits only, capped at maxLen
@@ -53,9 +63,16 @@ export default function EditProfilePage() {
     update(field, value.replace(/\D/g, "").slice(0, maxLen));
   }
 
+  function updatePhone(value: string) {
+    let d = value.replace(/\D/g, "");
+    if (d.length > 8 && d.startsWith("47")) d = d.slice(2); // pasted with country code
+    setPhoneDigits(d.slice(0, 8));
+  }
+
   const birthYearInvalid =
     form.birth_year.length === 4 &&
     (Number(form.birth_year) < 1900 || Number(form.birth_year) > currentYear);
+  const phoneInvalid = phoneDigits.length > 0 && phoneDigits.length < 8;
 
   async function uploadAvatar(file: File) {
     setUploading(true);
@@ -83,11 +100,16 @@ export default function EditProfilePage() {
       setError(`Fødselsår må være mellom 1900 og ${currentYear}.`);
       return;
     }
+    if (phoneInvalid) {
+      setError("Mobilnummer må ha 8 siffer.");
+      return;
+    }
     setSaving(true);
     try {
+      const phone = phoneDigits.length === 8 ? `+47 ${formatPhone(phoneDigits)}` : "";
       const updated = await api("/api/users/me", {
         method: "PUT",
-        body: JSON.stringify({ ...form, avatar_url: avatarUrl }),
+        body: JSON.stringify({ ...form, phone, avatar_url: avatarUrl }),
       });
       const stored = localStorage.getItem("user");
       const me = stored ? JSON.parse(stored) : {};
@@ -167,9 +189,8 @@ export default function EditProfilePage() {
               <label className={labelClass}>Navn</label>
               <input
                 value={form.name}
-                onChange={(e) => update("name", e.target.value)}
+                onChange={(e) => updateName("name", e.target.value, 60)}
                 required
-                maxLength={60}
                 className={inputClass}
               />
             </div>
@@ -177,8 +198,7 @@ export default function EditProfilePage() {
               <label className={labelClass}>Visningsnavn</label>
               <input
                 value={form.display_name}
-                onChange={(e) => update("display_name", e.target.value)}
-                maxLength={40}
+                onChange={(e) => updateName("display_name", e.target.value, 40)}
                 className={inputClass}
               />
             </div>
@@ -206,13 +226,21 @@ export default function EditProfilePage() {
             </div>
             <div>
               <label className={labelClass}>Mobilnummer</label>
-              <input
-                inputMode="tel"
-                value={form.phone}
-                onChange={(e) => updatePhone(e.target.value)}
-                className={inputClass}
-                placeholder="+47 12345678"
-              />
+              <div className="flex">
+                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-line bg-subtle text-ink-secondary text-sm shrink-0">
+                  +47
+                </span>
+                <input
+                  inputMode="numeric"
+                  value={formatPhone(phoneDigits)}
+                  onChange={(e) => updatePhone(e.target.value)}
+                  className={`w-full border border-line rounded-r-lg px-3 py-2 outline-none focus:border-brand ${
+                    phoneInvalid ? "border-red-400" : ""
+                  }`}
+                  placeholder="123 45 678"
+                />
+              </div>
+              {phoneInvalid && <p className="text-xs text-red-600 mt-1">Må ha 8 siffer</p>}
             </div>
           </div>
         </section>
@@ -243,8 +271,7 @@ export default function EditProfilePage() {
               <label className={labelClass}>Poststed</label>
               <input
                 value={form.city}
-                onChange={(e) => update("city", e.target.value)}
-                maxLength={60}
+                onChange={(e) => updateName("city", e.target.value, 60)}
                 className={inputClass}
               />
             </div>
@@ -252,8 +279,7 @@ export default function EditProfilePage() {
               <label className={labelClass}>Land</label>
               <input
                 value={form.country}
-                onChange={(e) => update("country", e.target.value)}
-                maxLength={60}
+                onChange={(e) => updateName("country", e.target.value, 60)}
                 className={inputClass}
               />
             </div>
