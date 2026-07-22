@@ -60,6 +60,22 @@ func (h *Handler) MarkSold(c *gin.Context) {
 		return
 	}
 
+	// Email the buyer asking for a review (non-blocking)
+	if h.Email != nil {
+		if buyer, err := h.Queries.GetUserByID(context.Background(), pgUUID(buyerID)); err == nil {
+			seller, _ := h.Queries.GetUserByID(context.Background(), existing.UserID)
+			sellerName := seller.Name
+			if seller.DisplayName != "" {
+				sellerName = seller.DisplayName
+			}
+			buyerName := buyer.Name
+			if buyer.DisplayName != "" {
+				buyerName = buyer.DisplayName
+			}
+			h.Email.SendReviewRequest(buyer.Email, buyerName, existing.Title, sellerName, listingID.String())
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "markert som solgt"})
 }
 
