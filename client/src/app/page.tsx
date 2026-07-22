@@ -28,7 +28,7 @@ function HomeInner() {
   const [filters, setFilters] = useState({
     query: "",
     category: "",
-    county: "",
+    place: "",
     condition: "",
     ad_type: "",
     min_price: "",
@@ -58,7 +58,7 @@ function HomeInner() {
       runSearch({ query: q });
     } else {
       setIsSearchResult(false);
-      setFilters({ query: "", category: "", county: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
+      setFilters({ query: "", category: "", place: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
       api("/api/listings")
         .then((data) => {
           setListings(data ?? []);
@@ -96,7 +96,7 @@ function HomeInner() {
       const body = {
         query: f.query,
         category: f.category,
-        county: f.county,
+        place: f.place,
         condition: f.condition,
         ad_type: f.ad_type,
         min_price: f.min_price ? Math.round(parseFloat(f.min_price) * 100) : 0,
@@ -119,7 +119,7 @@ function HomeInner() {
   }
 
   async function resetAll() {
-    setFilters({ query: "", category: "", county: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
+    setFilters({ query: "", category: "", place: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
     setLoading(true);
     try {
       const data = await api("/api/listings");
@@ -195,8 +195,14 @@ function HomeInner() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Postnummer</label>
-                  <input value={filters.county} onChange={(e) => update("county", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="f.eks. 0150" maxLength={4} />
+                  <label className="block text-sm font-medium text-ink mb-1">Sted eller postnummer</label>
+                  <input
+                    value={filters.place}
+                    onChange={(e) => update("place", e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && runSearch()}
+                    className={inputClass}
+                    placeholder="f.eks. Oslo eller 0150"
+                  />
                 </div>
 
                 <div>

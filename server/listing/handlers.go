@@ -33,6 +33,7 @@ type createRequest struct {
 	StreetAddress string   `json:"street_address"`
 	Latitude      float64  `json:"latitude"`
 	Longitude     float64  `json:"longitude"`
+	PostalCode    string   `json:"postal_code"`
 	Images        []string `json:"images"`
 }
 
@@ -270,6 +271,7 @@ type searchRequest struct {
 	MinPrice  int32  `json:"min_price"`
 	MaxPrice  int32  `json:"max_price"`
 	SortBy    string `json:"sort_by"`
+	Place     string `json:"place"`
 }
 
 func (h *Handler) Search(c *gin.Context) {
@@ -298,9 +300,12 @@ func (h *Handler) Search(c *gin.Context) {
 		args = append(args, req.Category)
 		argN++
 	}
-	if req.County != "" {
-		sql += " AND county = $" + strconv.Itoa(argN)
-		args = append(args, req.County)
+	if req.Place != "" {
+		p := strconv.Itoa(argN)
+		sql += " AND (postal_code = $" + p +
+			" OR municipality ILIKE '%' || $" + p + " || '%'" +
+			" OR county ILIKE '%' || $" + p + " || '%')"
+		args = append(args, req.Place)
 		argN++
 	}
 	if req.Condition != "" {

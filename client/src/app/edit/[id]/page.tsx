@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { CATEGORIES } from "@/lib/categories";
+import AddressAutocomplete, { SelectedAddress } from "@/components/AddressAutocomplete";
 
 export default function EditListingPage() {
   const params = useParams();
@@ -11,26 +13,38 @@ export default function EditListingPage() {
     title: "",
     description: "",
     price: "",
-    category: "",
+    category: CATEGORIES[0],
     condition: "good",
+    ad_type: "sale",
+    street_address: "",
+    postal_code: "",
+    city: "",
     county: "",
-    municipality: "",
   });
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api(`/api/listings/${params.id}`)
       .then((data) => {
+        const l = data.listing;
         setForm({
-          title: data.title,
-          description: data.description,
-          price: String(data.price_ore / 100),
-          category: data.category,
-          condition: data.condition,
-          county: data.county,
-          municipality: data.municipality,
+          title: l.title ?? "",
+          description: l.description ?? "",
+          price: String((l.price_ore ?? 0) / 100),
+          category: l.category ?? CATEGORIES[0],
+          condition: l.condition ?? "good",
+          ad_type: l.ad_type ?? "sale",
+          street_address: l.street_address ?? "",
+          postal_code: l.postal_code ?? "",
+          city: l.municipality ?? "",
+          county: l.county ?? "",
         });
+        if (l.latitude && l.longitude) {
+          setCoords({ lat: l.latitude, lon: l.longitude });
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -40,97 +54,174 @@ export default function EditListingPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function onAddressSelect(addr: SelectedAddress) {
+    setForm((prev) => ({
+      ...prev,
+      street_address: addr.street,
+      postal_code: addr.postalCode,
+      city: addr.city,
+      county: addr.county,
+    }));
+    setCoords({ lat: addr.latitude, lon: addr.longitude });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setSaving(true);
     try {
       await api(`/api/listings/${params.id}`, {
         method: "PUT",
         body: JSON.stringify({
           title: form.title,
           description: form.description,
-          price_ore: Math.round(parseFloat(form.price) * 100),
+          price_ore: form.ad_type === "giveaway" ? 0 : Math.round(parseFloat(form.price || "0") * 100),
           category: form.category,
           condition: form.condition,
-          county: form.county,
-          municipality: form.municipality,
+          county: form.county || "Norge",
+          municipality: form.city || form.postal_code,
+          street_address: form.street_address,
+          postal_code: form.postal_code,
+          latitude: coords?.lat ?? 0,
+          longitude: coords?.lon ?? 0,
         }),
       });
       router.push("/my-listings");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      setError(err instanceof Error ? err.message : "Kunne ikke lagre endringer");
+    } finally {
+      setSaving(false);
     }
   }
 
-  if (loading) return <p className="p-8">Loading...</p>;
+  const inputClass = "w-full border border-line rounded-xl px-3.5 py-2.5 outline-none focus:border-brand bg-surface";
+  const labelClass = "block text-sm font-medium text-ink mb-1.5";
+
+  if (loading) return <p className="max-w-2xl mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
 
   return (
-    <main className="max-w-lg mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-6">Edit listing</h1>
+    <main className="max-w-2xl mx-auto px-[5%] py-8">
+      <button onClick={() => router.push("/my-listings")} className="text-brand text-sm mb-4 hover:underline">
+        ← Tilbake til mine annonser
+      </button>
+      <h1 className="text-2xl font-semibold mb-6 text-ink">Endre annonse</h1>
 
-      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+      <form onSubmit={handleSubmit} className="bg-surface border border-line rounded-2xl p-6 shadow-sm space-y-4">
+        {error && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
 
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          placeholder="Title"
-          value={form.title}
-          onChange={(e) => update("title", e.target.value)}
-          required
-          className="w-full border rounded px-3 py-2"
-        />
-        <textarea
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => update("description", e.target.value)}
-          required
-          className="w-full border rounded px-3 py-2"
-          rows={4}
-        />
-        <input
-          type="number"
-          step="0.01"
-          placeholder="Price (kr)"
-          value={form.price}
-          onChange={(e) => update("price", e.target.value)}
-          required
-          className="w-full border rounded px-3 py-2"
-        />
-        <input
-          placeholder="Category"
-          value={form.category}
-          onChange={(e) => update("category", e.target.value)}
-          required
-          className="w-full border rounded px-3 py-2"
-        />
-        <select
-          value={form.condition}
-          onChange={(e) => update("condition", e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="new">New</option>
-          <option value="like_new">Like new</option>
-          <option value="good">Good</option>
-          <option value="fair">Fair</option>
-        </select>
-        <input
-          placeholder="County"
-          value={form.county}
-          onChange={(e) => update("county", e.target.value)}
-          required
-          className="w-full border rounded px-3 py-2"
-        />
-        <input
-          placeholder="Municipality"
-          value={form.municipality}
-          onChange={(e) => update("municipality", e.target.value)}
-          required
-          className="w-full border rounded px-3 py-2"
-        />
+        <div>
+          <label className={labelClass}>Type annonse</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => update("ad_type", "sale")}
+              className={`flex-1 py-2.5 rounded-xl border font-medium text-sm ${
+                form.ad_type === "sale"
+                  ? "border-brand bg-brand-lightest text-brand"
+                  : "border-line text-ink-secondary hover:border-brand"
+              }`}
+            >
+              Til salgs
+            </button>
+            <button
+              type="button"
+              onClick={() => update("ad_type", "giveaway")}
+              className={`flex-1 py-2.5 rounded-xl border font-medium text-sm ${
+                form.ad_type === "giveaway"
+                  ? "border-brand bg-brand-lightest text-brand"
+                  : "border-line text-ink-secondary hover:border-brand"
+              }`}
+            >
+              Gis bort
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className={labelClass}>Tittel</label>
+          <input value={form.title} onChange={(e) => update("title", e.target.value)} required className={inputClass} />
+        </div>
+
+        <div>
+          <label className={labelClass}>Beskrivelse</label>
+          <textarea
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            required
+            rows={5}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Adresse</label>
+          <AddressAutocomplete
+            value={form.street_address}
+            onChange={(v) => update("street_address", v)}
+            onSelect={onAddressSelect}
+            placeholder="Begynn å skrive adressen..."
+            className={inputClass}
+          />
+          {form.postal_code ? (
+            <p className="text-xs text-brand mt-1.5">
+              ✓ {form.postal_code} {form.city}
+              {form.county ? ` · ${form.county}` : ""}
+            </p>
+          ) : (
+            <p className="text-xs text-ink-muted mt-1.5">
+              Velg en adresse fra listen — postnummer og poststed fylles ut automatisk.
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {form.ad_type === "sale" && (
+            <div>
+              <label className={labelClass}>Pris</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="1"
+                  value={form.price}
+                  onChange={(e) => update("price", e.target.value)}
+                  required
+                  className={`${inputClass} pr-10`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-secondary text-sm pointer-events-none">
+                  kr
+                </span>
+              </div>
+            </div>
+          )}
+          <div>
+            <label className={labelClass}>Tilstand</label>
+            <select value={form.condition} onChange={(e) => update("condition", e.target.value)} className={inputClass}>
+              <option value="new">Ny</option>
+              <option value="like_new">Som ny</option>
+              <option value="good">God</option>
+              <option value="fair">Brukbar</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Kategori</label>
+            <select value={form.category} onChange={(e) => update("category", e.target.value)} className={inputClass}>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white rounded py-2 hover:bg-blue-700"
+          disabled={saving}
+          className="w-full bg-brand text-white rounded-xl py-3 font-medium hover:bg-brand-dark disabled:opacity-50 shadow-sm"
         >
-          Save changes
+          {saving ? "Lagrer..." : "Lagre endringer"}
         </button>
       </form>
     </main>
