@@ -61,8 +61,13 @@ func (h *Handler) MarkSold(c *gin.Context) {
 	}
 
 	// Email the buyer asking for a review (non-blocking)
-	if h.Email != nil {
-		if buyer, err := h.Queries.GetUserByID(context.Background(), pgUUID(buyerID)); err == nil {
+	if h.Email == nil {
+		log.Println("email: mailer not configured")
+	} else {
+		buyer, err := h.Queries.GetUserByID(context.Background(), pgUUID(buyerID))
+		if err != nil {
+			log.Printf("email: could not load buyer: %v", err)
+		} else {
 			seller, _ := h.Queries.GetUserByID(context.Background(), existing.UserID)
 			sellerName := seller.Name
 			if seller.DisplayName != "" {
@@ -72,6 +77,7 @@ func (h *Handler) MarkSold(c *gin.Context) {
 			if buyer.DisplayName != "" {
 				buyerName = buyer.DisplayName
 			}
+			log.Printf("email: sending review request to %s", buyer.Email)
 			h.Email.SendReviewRequest(buyer.Email, buyerName, existing.Title, sellerName, listingID.String())
 		}
 	}
