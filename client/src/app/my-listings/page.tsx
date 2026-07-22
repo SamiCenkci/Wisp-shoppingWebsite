@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type Image = { id: string; url: string };
 type Listing = {
@@ -42,6 +43,7 @@ export default function MyListingsPage() {
   const [soldModal, setSoldModal] = useState<{ listingId: string; title: string } | null>(null);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [loadingBuyers, setLoadingBuyers] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   function load() {
     api("/api/listings/mine")
@@ -62,8 +64,10 @@ export default function MyListingsPage() {
     return () => window.removeEventListener("click", closeOnOutside);
   }, []);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Slette denne annonsen?")) return;
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
     try {
       await api(`/api/listings/${id}`, { method: "DELETE" });
       setListings((prev) => prev.filter((l) => l.id !== id));
@@ -273,7 +277,7 @@ export default function MyListingsPage() {
                           Endre annonsen
                         </button>
                         <button
-                          onClick={() => handleDelete(listing.id)}
+                          onClick={() => setDeleteTarget({ id: listing.id, title: listing.title })}
                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                         >
                           Slett
@@ -332,6 +336,15 @@ export default function MyListingsPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Slette annonsen?"
+        message={deleteTarget ? `"${deleteTarget.title}" blir borte for godt.` : undefined}
+        confirmLabel="Slett"
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </main>
   );
 }
