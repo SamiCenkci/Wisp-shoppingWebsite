@@ -36,6 +36,7 @@ type Seller = {
   avatar_url: string;
   created_at: string;
 };
+type Buyer = { id: string; name: string; display_name: string };
 
 export default function ListingDetailPage() {
   const params = useParams();
@@ -50,32 +51,66 @@ export default function ListingDetailPage() {
   const [liked, setLiked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [soldModal, setSoldModal] = useState(false);
+  const [buyers, setBuyers] = useState<Buyer[]>([]);
+  const [loadingBuyers, setLoadingBuyers] = useState(false);
+
+  function loadListing() {
+    return api(`/api/listings/${params.id}`).then((data) => {
+      setListing(data.listing);
+      setImages(data.images ?? []);
+      setSimilar(data.similar ?? []);
+      setSeller(data.seller ?? null);
+      setLikeCount(data.like_count ?? 0);
+      setLiked(data.liked_by_me ?? false);
+      const stored = localStorage.getItem("user");
+      if (stored && data.seller) {
+        try {
+          const me = JSON.parse(stored);
+          setIsOwn(me.id === data.seller.id);
+          const soldTo = data.listing?.sold_to;
+          const isSold = data.listing?.status === "sold";
+          setCanReview(Boolean(isSold && soldTo && (me.id === soldTo || me.id === data.seller.id)));
+        } catch {}
+      }
+      return data;
+    });
+  }
 
   useEffect(() => {
     setLoading(true);
-    api(`/api/listings/${params.id}`)
-      .then((data) => {
-        setListing(data.listing);
-        setImages(data.images ?? []);
-        setSimilar(data.similar ?? []);
-        setSeller(data.seller ?? null);
-        setLikeCount(data.like_count ?? 0);
-        setLiked(data.liked_by_me ?? false);
-        const stored = localStorage.getItem("user");
-        if (stored && data.seller) {
-          try {
-            const me = JSON.parse(stored);
-            setIsOwn(me.id === data.seller.id);
-            const soldTo = data.listing?.sold_to;
-            const isSold = data.listing?.status === "sold";
-            setCanReview(Boolean(isSold && soldTo && (me.id === soldTo || me.id === data.seller.id)));
-          } catch {}
-        }
-        window.scrollTo(0, 0);
-      })
+    loadListing()
+      .then(() => window.scrollTo(0, 0))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  async function openSoldModal() {
+    setSoldModal(true);
+    setLoadingBuyers(true);
+    try {
+      const data = await api(`/api/listings/${params.id}/buyers`);
+      setBuyers(data ?? []);
+    } catch {
+      setBuyers([]);
+    } finally {
+      setLoadingBuyers(false);
+    }
+  }
+
+  async function confirmSold(buyerId: string) {
+    try {
+      await api(`/api/listings/${params.id}/sold`, {
+        method: "PUT",
+        body: JSON.stringify({ buyer_id: buyerId }),
+      });
+      setSoldModal(false);
+      await loadListing();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Kunne ikke markere som solgt");
+    }
+  }
 
   async function toggleLike() {
     const token = localStorage.getItem("token");
@@ -183,16 +218,31 @@ export default function ListingDetailPage() {
           </div>
 
           {isOwn ? (
-            <div className="mt-6 w-full bg-subtle text-ink-muted rounded-lg py-3 font-medium text-center border border-line">
-              Dette er din egen annonse
+            <div className="mt-6 space-y-3">
+              <div className="w-full bg-subtle text-ink-muted rounded-lg py-3 font-medium text-center border border-line">
+                Dette er din egen annonse
+              </div>
+              {listing.status !== "sold" && (
+                <button
+                  onClick={openSoldModal}
+                  className="w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark"
+                >
+                  Marker som solgt
+                </button>
+              )}
+              <button
+                onClick={() => router.push(`/edit/${listing.id}`)}
+                className="w-full border border-line text-ink-secondary rounded-lg py-3 font-medium hover:border-brand hover:text-brand"
+              >
+                Endre annonsen
+              </button>
             </div>
           ) : (
             <button
-              disabled={listing.status !== "active"}
               onClick={startConversation}
-              className="mt-6 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed"
+              className="mt-6 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark"
             >
-              {listing.status === "active" ? "Send melding til selger" : "Ikke tilgjengelig"}
+              Send melding til selger
             </button>
           )}
 
@@ -205,7 +255,7 @@ export default function ListingDetailPage() {
             </button>
           )}
 
-          {seller && (
+          {seller && !isOwn && (
             <div
               onClick={() => router.push(`/profile/${seller.id}`)}
               className="mt-6 flex items-center gap-3 p-4 rounded-xl border border-line bg-surface cursor-pointer hover:border-brand transition-colors"
@@ -259,6 +309,51 @@ export default function ListingDetailPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {soldModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setSoldModal(false)}
+        >
+          <div
+            className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-ink mb-1">Hvem solgte du til?</h2>
+            <p className="text-sm text-ink-secondary mb-5">{listing.title}</p>
+
+            {loadingBuyers ? (
+              <p className="text-ink-secondary text-sm py-4">Laster...</p>
+            ) : buyers.length === 0 ? (
+              <p className="text-ink-secondary text-sm py-4">
+                Ingen har sendt melding om denne annonsen ennå, så det er ingen kjøper å velge.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {buyers.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => confirmSold(b.id)}
+                    className="w-full text-left px-4 py-3 rounded-xl border border-line hover:border-brand hover:bg-subtle flex items-center gap-3"
+                  >
+                    <span className="w-9 h-9 rounded-full bg-brand-lightest text-brand flex items-center justify-center font-bold shrink-0">
+                      {(b.display_name || b.name).charAt(0).toUpperCase()}
+                    </span>
+                    <span className="text-ink font-medium">{b.display_name || b.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setSoldModal(false)}
+              className="mt-5 w-full py-2.5 rounded-xl border border-line text-ink-secondary hover:text-ink"
+            >
+              Avbryt
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );
