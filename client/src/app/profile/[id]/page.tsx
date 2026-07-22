@@ -128,6 +128,14 @@ export default function ProfilePage() {
                 Rediger profil
               </button>
             )}
+            {isOwn && (
+              <button
+                onClick={() => router.push("/my-reviews")}
+                className="mt-2 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
+              >
+                Vurderinger
+              </button>
+            )}
           </div>
 
           <div className="mt-6 pt-6 border-t border-line space-y-3 text-sm">
