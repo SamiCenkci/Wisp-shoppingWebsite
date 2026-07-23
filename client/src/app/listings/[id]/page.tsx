@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { expiryLabel } from "@/lib/expiry";
 import dynamic from "next/dynamic";
+import { ATTRIBUTE_LABELS } from "@/lib/categories";
 
 const ListingMap = dynamic(() => import("@/components/ListingMap"), { ssr: false });
 
