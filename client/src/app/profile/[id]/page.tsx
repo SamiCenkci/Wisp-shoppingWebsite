@@ -1,299 +1,551 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
+import {
+  CATEGORIES,
+  CATEGORY_ICONS,
+  HIDDEN_FROM_NAV,
+  getSubs,
+  getProducts,
+  getAttributes,
+} from "@/lib/categories";
 
-const currentYear = new Date().getFullYear();
+type Image = { id: string; url: string };
+type Listing = {
+  id: string;
+  title: string;
+  description: string;
+  price_ore: number;
+  category: string;
+  county: string;
+  municipality: string;
+  ad_type?: string;
+  liked_by_me?: boolean;
+  images?: Image[];
+};
 
-// 8 digits -> "123 45 678"
-function formatPhone(digits: string) {
-  const d = digits.slice(0, 8);
-  if (d.length <= 3) return d;
-  if (d.length <= 5) return `${d.slice(0, 3)} ${d.slice(3)}`;
-  return `${d.slice(0, 3)} ${d.slice(3, 5)} ${d.slice(5)}`;
-}
+const emptyFilters = {
+  query: "",
+  category: "",
+  sub_category: "",
+  product_category: "",
+  place: "",
+  condition: "",
+  ad_type: "",
+  min_price: "",
+  max_price: "",
+  sort_by: "newest",
+};
 
-export default function EditProfilePage() {
+function HomeInner() {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    display_name: "",
-    bio: "",
-    birth_year: "",
-    gender: "",
-    street_address: "",
-    postal_code: "",
-    city: "",
-    country: "Norge",
-  });
-  const [phoneDigits, setPhoneDigits] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const searchParams = useSearchParams();
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [filters, setFilters] = useState(emptyFilters);
+  const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
+  const [isSearchResult, setIsSearchResult] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+
+  function seedLiked(data: Listing[]) {
+    const ids = new Set<string>();
+    (data ?? []).forEach((l) => {
+      if (l.liked_by_me) ids.add(l.id);
+    });
+    setLikedIds(ids);
+  }
+
+  // The category drill-down lives in the URL, so the browser back button
+  // steps out one level at a time instead of leaving the page.
+  function navigate(next: { category?: string; sub?: string; product?: string; query?: string }) {
+    const params = new URLSearchParams();
+    if (next.query) params.set("q", next.query);
+    if (next.category) params.set("category", next.category);
+    if (next.sub) params.set("sub", next.sub);
+    if (next.product) params.set("product", next.product);
+    const qs = params.toString();
+    router.push(qs ? `/?${qs}` : "/");
+  }
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (stored) {
-      try {
-        const me = JSON.parse(stored);
-        setForm((prev) => ({ ...prev, name: me.name ?? "", display_name: me.display_name ?? "" }));
-        setAvatarUrl(me.avatar_url ?? "");
-        if (me.phone) {
-          const d = String(me.phone).replace(/\D/g, "");
-          setPhoneDigits(d.length > 8 && d.startsWith("47") ? d.slice(2, 10) : d.slice(0, 8));
-        }
-      } catch {}
+    try {
+      const saved = JSON.parse(localStorage.getItem("recentSearches") || "[]");
+      if (Array.isArray(saved)) setRecentSearches(saved);
+    } catch {}
+
+    const q = searchParams.get("q") ?? "";
+    const category = searchParams.get("category") ?? "";
+    const sub = searchParams.get("sub") ?? "";
+    const product = searchParams.get("product") ?? "";
+
+    setAttrFilters({});
+    setSavedMsg("");
+
+    if (q || category) {
+      setFilters((prev) => ({
+        ...prev,
+        query: q,
+        category,
+        sub_category: sub,
+        product_category: product,
+      }));
+      runSearch({ query: q, category, sub_category: sub, product_category: product }, {});
+    } else {
+      setIsSearchResult(false);
+      setFilters(emptyFilters);
+      setLoading(true);
+      api("/api/listings")
+        .then((data) => {
+          setListings(data ?? []);
+          seedLiked(data ?? []);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   function update(field: string, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setFilters((prev) => ({ ...prev, [field]: value }));
   }
 
-  // Names: letters, spaces, hyphens and apostrophes only — no digits
-  function updateName(field: string, value: string, maxLen: number) {
-    update(field, value.replace(/[0-9]/g, "").slice(0, maxLen));
+  function saveSearch(term: string) {
+    const t = term.trim();
+    if (!t) return;
+    setRecentSearches((prev) => {
+      const next = [t, ...prev.filter((s) => s.toLowerCase() !== t.toLowerCase())].slice(0, 5);
+      localStorage.setItem("recentSearches", JSON.stringify(next));
+      return next;
+    });
   }
 
-  // Digits only, capped at maxLen
-  function updateDigits(field: string, value: string, maxLen: number) {
-    update(field, value.replace(/\D/g, "").slice(0, maxLen));
-  }
-
-  function updatePhone(value: string) {
-    let d = value.replace(/\D/g, "");
-    if (d.length > 8 && d.startsWith("47")) d = d.slice(2); // pasted with country code
-    setPhoneDigits(d.slice(0, 8));
-  }
-
-  const birthYearInvalid =
-    form.birth_year.length === 4 &&
-    (Number(form.birth_year) < 1900 || Number(form.birth_year) > currentYear);
-  const phoneInvalid = phoneDigits.length > 0 && phoneDigits.length < 8;
-
-  async function uploadAvatar(file: File) {
-    setUploading(true);
-    setError("");
+  async function runSearch(override?: Partial<typeof filters>, attrs?: Record<string, string>) {
+    setLoading(true);
+    const f = { ...filters, ...override };
     try {
-      const { upload_url, public_url } = await api("/api/uploads/presign", {
+      const body = {
+        query: f.query,
+        category: f.category,
+        sub_category: f.sub_category,
+        product_category: f.product_category,
+        attributes: attrs ?? attrFilters,
+        place: f.place,
+        condition: f.condition,
+        ad_type: f.ad_type,
+        min_price: f.min_price ? Math.round(parseFloat(f.min_price) * 100) : 0,
+        max_price: f.max_price ? Math.round(parseFloat(f.max_price) * 100) : 0,
+        sort_by: f.sort_by,
+      };
+      const data = await api("/api/listings/search", {
         method: "POST",
-        body: JSON.stringify({ file_name: file.name, content_type: file.type }),
+        body: JSON.stringify(body),
       });
-      const res = await fetch(upload_url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!res.ok) throw new Error("Opplasting feilet");
-      setAvatarUrl(public_url);
+      setListings(data ?? []);
+      seedLiked(data ?? []);
+      setIsSearchResult(true);
+      if (f.query) saveSearch(f.query);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Opplasting feilet");
+      console.error(err);
     } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setLoading(false);
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (birthYearInvalid) {
-      setError(`Fødselsår må være mellom 1900 og ${currentYear}.`);
+  function resetAll() {
+    navigate({});
+  }
+
+  function pickCategory(cat: string) {
+    navigate({ category: filters.category === cat ? "" : cat });
+  }
+
+  function pickSub(sub: string) {
+    navigate({
+      category: filters.category,
+      sub: filters.sub_category === sub ? "" : sub,
+    });
+  }
+
+  function pickProduct(prod: string) {
+    navigate({
+      category: filters.category,
+      sub: filters.sub_category,
+      product: filters.product_category === prod ? "" : prod,
+    });
+  }
+
+  function pickAttr(key: string, value: string) {
+    const next = { ...attrFilters, [key]: value };
+    setAttrFilters(next);
+    runSearch(undefined, next);
+  }
+
+  async function saveCurrentSearch() {
+    if (!localStorage.getItem("token")) {
+      router.push("/login");
       return;
     }
-    if (phoneInvalid) {
-      setError("Mobilnummer må ha 8 siffer.");
-      return;
-    }
-    setSaving(true);
+    const suggested =
+      filters.query ||
+      filters.product_category ||
+      filters.sub_category ||
+      filters.category ||
+      "Mitt søk";
+    const name = window.prompt("Gi søket et navn:", suggested);
+    if (!name) return;
+
+    setSavingSearch(true);
+    setSavedMsg("");
     try {
-      const phone = phoneDigits.length === 8 ? `+47 ${formatPhone(phoneDigits)}` : "";
-      const updated = await api("/api/users/me", {
-        method: "PUT",
-        body: JSON.stringify({ ...form, phone, avatar_url: avatarUrl }),
+      await api("/api/saved-searches", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          query: filters.query,
+          category: filters.category,
+          sub_category: filters.sub_category,
+          product_category: filters.product_category,
+          attributes: attrFilters,
+          place: filters.place,
+          condition: filters.condition,
+          ad_type: filters.ad_type,
+          min_price: filters.min_price ? Math.round(parseFloat(filters.min_price) * 100) : 0,
+          max_price: filters.max_price ? Math.round(parseFloat(filters.max_price) * 100) : 0,
+        }),
       });
-      const stored = localStorage.getItem("user");
-      const me = stored ? JSON.parse(stored) : {};
-      localStorage.setItem(
-        "user",
-        JSON.stringify({ ...me, name: updated.name, avatar_url: updated.avatar_url, display_name: updated.display_name })
-      );
-      router.push(`/profile/${updated.id}`);
+      setSavedMsg("Søket er lagret ✓");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lagring feilet");
+      setSavedMsg(err instanceof Error ? err.message : "Kunne ikke lagre søket");
     } finally {
-      setSaving(false);
+      setSavingSearch(false);
     }
   }
 
-  const inputClass = "w-full border border-line rounded-lg px-3 py-2 outline-none focus:border-brand";
-  const labelClass = "block text-sm font-medium text-ink mb-1";
+  async function toggleLike(e: React.MouseEvent, id: string) {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+    const isLiked = likedIds.has(id);
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (isLiked) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    try {
+      await api(`/api/listings/${id}/favorite`, { method: isLiked ? "DELETE" : "POST" });
+    } catch {
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (isLiked) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  const inputClass = "w-full border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-brand";
+
+  const filterSubs = getSubs(filters.category);
+  const filterProducts = getProducts(filters.category, filters.sub_category);
+  const filterAttrs = getAttributes(filters.category, filters.sub_category, filters.product_category);
 
   return (
-    <main className="max-w-2xl mx-auto px-[5%] py-10">
-      <h1 className="text-2xl font-semibold mb-6 text-ink">Rediger profil</h1>
+    <main>
+      <div className="border-b border-line bg-surface">
+        <div className="max-w-[1400px] mx-auto px-[5%]">
+          <nav className="py-4">
+            {!filters.category ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
+                {CATEGORIES.filter((c) => !HIDDEN_FROM_NAV.includes(c)).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => pickCategory(cat)}
+                    className="flex items-center gap-2 text-left text-xs leading-tight text-ink-secondary hover:text-brand transition-colors"
+                  >
+                    <span className="text-base leading-none shrink-0">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
+                    <span>{cat}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center flex-wrap gap-1.5 text-sm mb-3">
+                  <button onClick={() => navigate({})} className="text-brand hover:text-brand-dark">
+                    Alle kategorier
+                  </button>
+                  <span className="text-ink-muted">/</span>
+                  {filters.sub_category ? (
+                    <>
+                      <button
+                        onClick={() => navigate({ category: filters.category })}
+                        className="text-brand hover:text-brand-dark"
+                      >
+                        {filters.category}
+                      </button>
+                      <span className="text-ink-muted">/</span>
+                      <span className="font-medium text-ink">{filters.sub_category}</span>
+                    </>
+                  ) : (
+                    <span className="font-medium text-ink">{filters.category}</span>
+                  )}
+                </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2">
+                  {(filters.sub_category
+                    ? filterProducts.map((p) => p.name)
+                    : filterSubs.map((s) => s.name)
+                  ).map((name) => {
+                    const active = filters.sub_category
+                      ? filters.product_category === name
+                      : filters.sub_category === name;
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => (filters.sub_category ? pickProduct(name) : pickSub(name))}
+                        className={`text-left text-xs leading-tight transition-colors ${
+                          active ? "text-brand font-medium" : "text-ink-secondary hover:text-brand"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </nav>
+        </div>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto px-[5%] py-8 flex gap-8">
+        {(isSearchResult || filters.category) && (
+          <aside className="w-64 shrink-0 hidden lg:block">
+            <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm sticky top-24">
+              <h2 className="font-semibold text-ink mb-4">Filtrer søk</h2>
+
+              <div className="space-y-4">
+                {filterSubs.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-ink mb-1">Underkategori</label>
+                    <select
+                      value={filters.sub_category}
+                      onChange={(e) => navigate({ category: filters.category, sub: e.target.value })}
+                      className={inputClass}
+                    >
+                      <option value="">Alle</option>
+                      {filterSubs.map((s) => (
+                        <option key={s.name} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {filterProducts.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-ink mb-1">Produktkategori</label>
+                    <select
+                      value={filters.product_category}
+                      onChange={(e) =>
+                        navigate({
+                          category: filters.category,
+                          sub: filters.sub_category,
+                          product: e.target.value,
+                        })
+                      }
+                      className={inputClass}
+                    >
+                      <option value="">Alle</option>
+                      {filterProducts.map((p) => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {filterAttrs.map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-sm font-medium text-ink mb-1">{field.label}</label>
+                    <select
+                      value={attrFilters[field.key] ?? ""}
+                      onChange={(e) => pickAttr(field.key, e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Alle</option>
+                      {field.options.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Sted eller postnummer</label>
+                  <input
+                    value={filters.place}
+                    onChange={(e) => update("place", e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && runSearch()}
+                    className={inputClass}
+                    placeholder="f.eks. Oslo eller 0150"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Type annonse</label>
+                  <select value={filters.ad_type} onChange={(e) => update("ad_type", e.target.value)} className={inputClass}>
+                    <option value="">Alle</option>
+                    <option value="sale">Til salgs</option>
+                    <option value="giveaway">Gis bort</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-2">Prisklasse</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-ink-muted mb-1">Fra</label>
+                      <input type="number" value={filters.min_price} onChange={(e) => update("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="0 kr" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-ink-muted mb-1">Til</label>
+                      <input type="number" value={filters.max_price} onChange={(e) => update("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="Maks" />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Tilstand</label>
+                  <select value={filters.condition} onChange={(e) => update("condition", e.target.value)} className={inputClass}>
+                    <option value="">Alle</option>
+                    <option value="new">Ny</option>
+                    <option value="like_new">Som ny</option>
+                    <option value="good">God</option>
+                    <option value="fair">Brukbar</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1">Sortering</label>
+                  <select value={filters.sort_by} onChange={(e) => update("sort_by", e.target.value)} className={inputClass}>
+                    <option value="newest">Nyeste først</option>
+                    <option value="price_asc">Pris: lav til høy</option>
+                    <option value="price_desc">Pris: høy til lav</option>
+                  </select>
+                </div>
+
+                <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
+                  Bruk filtre
+                </button>
+
+                <button
+                  onClick={saveCurrentSearch}
+                  disabled={savingSearch}
+                  className="w-full border border-brand text-brand rounded-lg py-2 font-medium hover:bg-brand-lightest disabled:opacity-50"
+                >
+                  {savingSearch ? "Lagrer..." : "🔔 Lagre søk"}
+                </button>
+                {savedMsg && <p className="text-xs text-center text-ink-secondary">{savedMsg}</p>}
+
+                <button onClick={resetAll} className="w-full text-sm text-ink-secondary hover:text-brand underline">
+                  Nullstill
+                </button>
+              </div>
+            </div>
+          </aside>
         )}
 
-        <section className="bg-surface border border-line rounded-2xl p-6 shadow-sm">
-          <h2 className="font-semibold text-ink mb-4">Fortell om deg selv</h2>
-
-          <div className="flex flex-col items-center mb-6">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) uploadAvatar(f);
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="group relative w-28 h-28 rounded-full bg-brand-lightest overflow-hidden flex items-center justify-center border-2 border-line hover:border-brand transition-colors disabled:opacity-60"
-              aria-label="Endre profilbilde"
-            >
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="Profilbilde" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-brand text-4xl font-bold">{form.name.charAt(0).toUpperCase() || "?"}</span>
-              )}
-              <span className="absolute inset-0 bg-black/50 text-white text-xs font-medium flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                {uploading ? "Laster opp..." : "Endre bilde"}
+        <section className="flex-1">
+          <div className="flex items-center justify-between mb-5">
+            <h1 className="text-xl font-semibold text-ink">
+              {isSearchResult || filters.category ? "Søkeresultater" : "Siste annonser"}
+              <span className="text-ink-muted font-normal text-base ml-2">
+                ({listings.length})
               </span>
-            </button>
-            <p className="text-xs text-ink-muted mt-2">Trykk på bildet for å endre</p>
+            </h1>
+            {(isSearchResult || filters.category) && (
+              <button onClick={resetAll} className="text-sm text-ink-secondary hover:text-brand underline">
+                Vis alle annonser
+              </button>
+            )}
           </div>
 
-          <label className={labelClass}>Beskrivelse</label>
-          <textarea
-            value={form.bio}
-            onChange={(e) => update("bio", e.target.value)}
-            rows={3}
-            maxLength={500}
-            className={inputClass}
-            placeholder="Beskrivelsen kan ikke inneholde telefonnumre, e-postadresser eller lenker. Maksimum 500 tegn."
-          />
-          <p className="text-xs text-ink-muted mt-1">{form.bio.length}/500 tegn</p>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="rounded-2xl overflow-hidden border border-line bg-surface">
+                  <div className="h-44 bg-subtle animate-pulse" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-4 bg-subtle rounded animate-pulse" />
+                    <div className="h-4 w-1/2 bg-subtle rounded animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : listings.length === 0 ? (
+            <div className="bg-surface border border-line rounded-2xl p-16 text-center">
+              <p className="text-ink-secondary">
+                {isSearchResult ? "Ingen annonser matcher søket ditt." : "Ingen annonser ennå."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {listings.map((listing) => (
+                <div
+                  key={listing.id}
+                  onClick={() => router.push(`/listings/${listing.id}`)}
+                  className="group cursor-pointer rounded-2xl overflow-hidden border border-line bg-surface shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="h-44 w-full overflow-hidden bg-subtle relative">
+                    <button
+                      onClick={(e) => toggleLike(e, listing.id)}
+                      className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-surface/90 backdrop-blur flex items-center justify-center text-lg hover:scale-110 transition-transform shadow-sm"
+                      aria-label="Lik annonse"
+                    >
+                      {likedIds.has(listing.id) ? "❤️" : "🤍"}
+                    </button>
+                    {listing.images && listing.images.length > 0 ? (
+                      <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
+                    )}
+                    <span className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-surface/90 text-ink-secondary backdrop-blur">
+                      {listing.category}
+                    </span>
+                    {listing.ad_type === "giveaway" && (
+                      <span className="absolute bottom-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-brand text-white">
+                        Gis bort
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium truncate text-ink">{listing.title}</h3>
+                    <p className="font-semibold mt-1 text-lg text-ink">
+                      {listing.ad_type === "giveaway" ? "Gratis" : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
+                    </p>
+                    <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}, {listing.county}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
-
-        <section className="bg-surface border border-line rounded-2xl p-6 shadow-sm">
-          <h2 className="font-semibold text-ink mb-4">Om deg</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Navn</label>
-              <input
-                value={form.name}
-                onChange={(e) => updateName("name", e.target.value, 60)}
-                required
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Visningsnavn</label>
-              <input
-                value={form.display_name}
-                onChange={(e) => updateName("display_name", e.target.value, 40)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Født (årstall)</label>
-              <input
-                inputMode="numeric"
-                value={form.birth_year}
-                onChange={(e) => updateDigits("birth_year", e.target.value, 4)}
-                className={`${inputClass} ${birthYearInvalid ? "border-red-400" : ""}`}
-                placeholder="2002"
-              />
-              {birthYearInvalid && (
-                <p className="text-xs text-red-600 mt-1">Må være mellom 1900 og {currentYear}</p>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>Kjønn</label>
-              <select value={form.gender} onChange={(e) => update("gender", e.target.value)} className={inputClass}>
-                <option value="">Velg...</option>
-                <option value="Mann">Mann</option>
-                <option value="Kvinne">Kvinne</option>
-                <option value="Annet">Annet</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Mobilnummer</label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-line bg-subtle text-ink-secondary text-sm shrink-0">
-                  +47
-                </span>
-                <input
-                  inputMode="numeric"
-                  value={formatPhone(phoneDigits)}
-                  onChange={(e) => updatePhone(e.target.value)}
-                  className={`w-full border border-line rounded-r-lg px-3 py-2 outline-none focus:border-brand ${
-                    phoneInvalid ? "border-red-400" : ""
-                  }`}
-                  placeholder="123 45 678"
-                />
-              </div>
-              {phoneInvalid && <p className="text-xs text-red-600 mt-1">Må ha 8 siffer</p>}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-surface border border-line rounded-2xl p-6 shadow-sm">
-          <h2 className="font-semibold text-ink mb-4">Adresse</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Gateadresse</label>
-              <input
-                value={form.street_address}
-                onChange={(e) => update("street_address", e.target.value)}
-                maxLength={100}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Postnummer</label>
-              <input
-                inputMode="numeric"
-                value={form.postal_code}
-                onChange={(e) => updateDigits("postal_code", e.target.value, 4)}
-                className={inputClass}
-                placeholder="0150"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Poststed</label>
-              <input
-                value={form.city}
-                onChange={(e) => updateName("city", e.target.value, 60)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Land</label>
-              <input
-                value={form.country}
-                onChange={(e) => updateName("country", e.target.value, 60)}
-                className={inputClass}
-              />
-            </div>
-          </div>
-        </section>
-
-        <button
-          type="submit"
-          disabled={saving || uploading}
-          className="w-full bg-brand text-white rounded-lg py-2.5 font-medium hover:bg-brand-dark disabled:opacity-50"
-        >
-          {saving ? "Lagrer..." : "Lagre endringer"}
-        </button>
-      </form>
+      </div>
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<main className="max-w-[1400px] mx-auto px-[5%] py-8 text-ink-secondary">Laster...</main>}>
+      <HomeInner />
+    </Suspense>
   );
 }

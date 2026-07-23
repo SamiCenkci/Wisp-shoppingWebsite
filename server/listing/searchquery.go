@@ -1,6 +1,8 @@
 package listing
 
-import "strconv"
+import (
+	"strconv"
+)
 
 // buildSearchQuery turns a search request into SQL plus its arguments.
 //
@@ -79,6 +81,14 @@ func buildSearchQuery(req searchRequest) (string, []interface{}) {
 	if req.MaxPrice > 0 {
 		sql += " AND price_ore <= $" + strconv.Itoa(argN)
 		args = append(args, req.MaxPrice)
+		argN++
+	}
+
+	// Only used by the saved-search alert runner, to find listings posted
+	// since that search was last checked.
+	if req.CreatedSince != nil {
+		sql += " AND created_at > $" + strconv.Itoa(argN)
+		args = append(args, *req.CreatedSince)
 		argN++
 	}
 

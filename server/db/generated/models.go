@@ -83,6 +83,24 @@ type Review struct {
 	RepliedAt      pgtype.Timestamptz `json:"replied_at"`
 }
 
+type SavedSearch struct {
+	ID              pgtype.UUID        `json:"id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Name            string             `json:"name"`
+	Query           string             `json:"query"`
+	Category        string             `json:"category"`
+	SubCategory     string             `json:"sub_category"`
+	ProductCategory string             `json:"product_category"`
+	Attributes      []byte             `json:"attributes"`
+	Place           string             `json:"place"`
+	Condition       string             `json:"condition"`
+	AdType          string             `json:"ad_type"`
+	MinPrice        int32              `json:"min_price"`
+	MaxPrice        int32              `json:"max_price"`
+	LastCheckedAt   pgtype.Timestamptz `json:"last_checked_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
 type Token struct {
 	ID        pgtype.UUID        `json:"id"`
 	UserID    pgtype.UUID        `json:"user_id"`

@@ -34,7 +34,12 @@ func main() {
 		Email:     mailer,
 	}
 
-	listingHandler := &listing.Handler{Queries: queries, Pool: pool, Email: mailer}
+	listingHandler := &listing.Handler{
+		Queries:     queries,
+		Pool:        pool,
+		Email:       mailer,
+		AlertSecret: cfg.AlertSecret,
+	}
 
 	uploadHandler := &upload.Handler{
 		Region:    cfg.AWSRegion,
@@ -61,7 +66,7 @@ func main() {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Alert-Secret"},
 		AllowCredentials: true,
 	}))
 
@@ -114,6 +119,13 @@ func main() {
 		api.POST("/reviews/:id/reply", auth.RequireAuth(cfg.JWTSecret), listingHandler.ReplyToReview)
 		api.GET("/reviews/given", auth.RequireAuth(cfg.JWTSecret), listingHandler.MyGivenReviews)
 		api.GET("/listings/:id/can-review", auth.RequireAuth(cfg.JWTSecret), listingHandler.CanReview)
+
+		api.POST("/saved-searches", auth.RequireAuth(cfg.JWTSecret), listingHandler.CreateSavedSearch)
+		api.GET("/saved-searches", auth.RequireAuth(cfg.JWTSecret), listingHandler.ListSavedSearches)
+		api.DELETE("/saved-searches/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.DeleteSavedSearch)
+
+		// Triggered by an external scheduler, guarded by X-Alert-Secret.
+		api.POST("/internal/run-alerts", listingHandler.RunAlerts)
 	}
 
 	router.Run(":" + cfg.Port)

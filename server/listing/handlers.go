@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
 	"github.com/SamiCenkci/Shopping-Website/email"
@@ -17,9 +18,10 @@ import (
 )
 
 type Handler struct {
-	Queries *db.Queries
-	Pool    *pgxpool.Pool
-	Email   *email.Sender
+	Queries     *db.Queries
+	Pool        *pgxpool.Pool
+	Email       *email.Sender
+	AlertSecret string
 }
 
 type createRequest struct {
@@ -314,6 +316,9 @@ type searchRequest struct {
 	MaxPrice        int32             `json:"max_price"`
 	SortBy          string            `json:"sort_by"`
 	Place           string            `json:"place"`
+
+	// Set internally by the alert runner, never from JSON.
+	CreatedSince *time.Time `json:"-"`
 }
 
 func (h *Handler) Search(c *gin.Context) {
@@ -448,6 +453,11 @@ func attrsJSON(m map[string]string) []byte {
 		return []byte("{}")
 	}
 	return b
+}
+
+// jsonUnmarshal is a thin alias so savedsearch.go doesn't need its own import.
+func jsonUnmarshal(data []byte, v interface{}) error {
+	return json.Unmarshal(data, v)
 }
 
 // likedSet returns the set of listing IDs the given user has favorited.

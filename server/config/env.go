@@ -18,6 +18,7 @@ type Config struct {
 	S3Bucket           string
 	AllowedOrigins     []string
 	ResendAPIKey       string
+	AlertSecret        string
 }
 
 func Load() *Config {

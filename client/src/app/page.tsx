@@ -49,6 +49,8 @@ function HomeInner() {
   const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
   const [isSearchResult, setIsSearchResult] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
 
   function seedLiked(data: Listing[]) {
     const ids = new Set<string>();
@@ -155,6 +157,47 @@ function HomeInner() {
 
   function resetAll() {
     navigate({});
+  }
+
+  async function saveCurrentSearch() {
+    if (!localStorage.getItem("token")) {
+      router.push("/login");
+      return;
+    }
+    const suggested =
+      filters.query ||
+      filters.product_category ||
+      filters.sub_category ||
+      filters.category ||
+      "Mitt søk";
+    const name = window.prompt("Gi søket et navn:", suggested);
+    if (!name) return;
+
+    setSavingSearch(true);
+    setSavedMsg("");
+    try {
+      await api("/api/saved-searches", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          query: filters.query,
+          category: filters.category,
+          sub_category: filters.sub_category,
+          product_category: filters.product_category,
+          attributes: attrFilters,
+          place: filters.place,
+          condition: filters.condition,
+          ad_type: filters.ad_type,
+          min_price: filters.min_price ? Math.round(parseFloat(filters.min_price) * 100) : 0,
+          max_price: filters.max_price ? Math.round(parseFloat(filters.max_price) * 100) : 0,
+        }),
+      });
+      setSavedMsg("Søket er lagret ✓");
+    } catch (err) {
+      setSavedMsg(err instanceof Error ? err.message : "Kunne ikke lagre søket");
+    } finally {
+      setSavingSearch(false);
+    }
   }
 
   function pickCategory(cat: string) {
@@ -396,7 +439,14 @@ function HomeInner() {
                     <option value="price_desc">Pris: høy til lav</option>
                   </select>
                 </div>
-
+                <button
+                  onClick={saveCurrentSearch}
+                  disabled={savingSearch}
+                  className="w-full border border-brand text-brand rounded-lg py-2 font-medium hover:bg-brand-lightest disabled:opacity-50"
+                >
+                  {savingSearch ? "Lagrer..." : "🔔 Lagre søk"}
+                </button>
+                {savedMsg && <p className="text-xs text-center text-ink-secondary">{savedMsg}</p>}
                 <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
                   Bruk filtre
                 </button>
