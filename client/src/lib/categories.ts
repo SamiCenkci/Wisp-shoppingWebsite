@@ -584,6 +584,3 @@ export const ATTRIBUTE_LABELS: Record<string, string> = (() => {
 
 /** Backwards compatible: the old flat list of category names. */
 export const CATEGORIES = TAXONOMY.map((m) => m.name);
-
-/** Categories that exist in the taxonomy but aren't shown in the homepage nav. */
-export const HIDDEN_FROM_NAV = ["Foreldre og barn"];

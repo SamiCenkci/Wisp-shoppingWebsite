@@ -3,8 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { CATEGORIES, CATEGORY_ICONS, HIDDEN_FROM_NAV, getSubs, getProducts, getAttributes } from "@/lib/categories";
-
+import { CATEGORIES, CATEGORY_ICONS } from "@/lib/categories";
 
 
 type Image = { id: string; url: string };
@@ -172,7 +171,7 @@ function HomeInner() {
       <div className="border-b border-line bg-surface">
         <div className="max-w-[1400px] mx-auto px-[5%]">
           <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3 py-4">
-            {CATEGORIES.filter((c) => !HIDDEN_FROM_NAV.includes(c)).map((cat) => (
+            {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => pickCategory(cat)}
