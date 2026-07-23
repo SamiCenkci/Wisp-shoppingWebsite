@@ -169,15 +169,15 @@ function HomeInner() {
     <main>
       <div className="border-b border-line bg-surface">
         <div className="max-w-[1400px] mx-auto px-[5%]">
-          <nav className="flex gap-1 overflow-x-auto">
+          <nav className="flex flex-wrap gap-2 py-3">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => pickCategory(cat)}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
                   filters.category === cat
-                    ? "border-brand text-brand"
-                    : "border-transparent text-ink-secondary hover:text-ink"
+                    ? "border-brand bg-brand-lightest text-brand"
+                    : "border-line text-ink-secondary hover:border-brand hover:text-brand"
                 }`}
               >
                 {cat}
