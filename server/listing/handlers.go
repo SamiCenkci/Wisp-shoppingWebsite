@@ -181,12 +181,18 @@ func (h *Handler) GetOne(c *gin.Context) {
 		}
 	}
 
+	attrs := listing.Attributes
+	if len(attrs) == 0 {
+		attrs = []byte("{}")
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"listing":     listing,
 		"images":      images,
 		"similar":     similarOut,
 		"like_count":  likeCount,
 		"liked_by_me": likedByMe,
+		"attributes":  json.RawMessage(attrs),
 		"seller": gin.H{
 			"id":           seller.ID,
 			"name":         seller.Name,
