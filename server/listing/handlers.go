@@ -195,6 +195,22 @@ func (h *Handler) GetOne(c *gin.Context) {
 			"created_at":   seller.CreatedAt.Time,
 		},
 	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"listing":     listing,
+		"images":      images,
+		"similar":     similarOut,
+		"like_count":  likeCount,
+		"liked_by_me": likedByMe,
+		"attributes":  json.RawMessage(listing.Attributes),
+		"seller": gin.H{
+			"id":           seller.ID,
+			"name":         seller.Name,
+			"display_name": seller.DisplayName,
+			"avatar_url":   seller.AvatarUrl.String,
+			"created_at":   seller.CreatedAt.Time,
+		},
+	})
 }
 
 func (h *Handler) Update(c *gin.Context) {
@@ -238,6 +254,7 @@ func (h *Handler) Update(c *gin.Context) {
 		SubCategory:     req.SubCategory,
 		ProductCategory: req.ProductCategory,
 		Attributes:      attrsJSON(req.Attributes),
+		PostalCode:      req.PostalCode,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -273,15 +290,17 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 type searchRequest struct {
-	Query     string `json:"query"`
-	Category  string `json:"category"`
-	County    string `json:"county"`
-	Condition string `json:"condition"`
-	AdType    string `json:"ad_type"`
-	MinPrice  int32  `json:"min_price"`
-	MaxPrice  int32  `json:"max_price"`
-	SortBy    string `json:"sort_by"`
-	Place     string `json:"place"`
+	Query           string            `json:"query"`
+	Category        string            `json:"category"`
+	SubCategory     string            `json:"sub_category"`
+	ProductCategory string            `json:"product_category"`
+	Attributes      map[string]string `json:"attributes"`
+	Condition       string            `json:"condition"`
+	AdType          string            `json:"ad_type"`
+	MinPrice        int32             `json:"min_price"`
+	MaxPrice        int32             `json:"max_price"`
+	SortBy          string            `json:"sort_by"`
+	Place           string            `json:"place"`
 }
 
 func (h *Handler) Search(c *gin.Context) {
@@ -310,6 +329,28 @@ func (h *Handler) Search(c *gin.Context) {
 		args = append(args, req.Category)
 		argN++
 	}
+
+	if req.SubCategory != "" {
+		sql += " AND sub_category = $" + strconv.Itoa(argN)
+		args = append(args, req.SubCategory)
+		argN++
+	}
+
+	if req.ProductCategory != "" {
+		sql += " AND product_category = $" + strconv.Itoa(argN)
+		args = append(args, req.ProductCategory)
+		argN++
+	}
+
+	for key, val := range req.Attributes {
+		if val == "" {
+			continue
+		}
+		sql += " AND attributes->>$" + strconv.Itoa(argN) + " = $" + strconv.Itoa(argN+1)
+		args = append(args, key, val)
+		argN += 2
+	}
+
 	if req.Place != "" {
 		p := strconv.Itoa(argN)
 		sql += " AND (postal_code = $" + p +
