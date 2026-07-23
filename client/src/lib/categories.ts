@@ -543,10 +543,14 @@ export const CATEGORY_ICONS: Record<string, string> = {
   "Næringsvirksomhet": "🏢",
   "Sport og friluftsliv": "⚽",
   "Utstyr til bil, båt og MC": "🚗",
+  
   "Annet": "🏷️",
 };
 
 // --- Lookup helpers -------------------------------------------------------
+
+/** Categories that exist in the taxonomy but aren't shown in the homepage nav. */
+export const HIDDEN_FROM_NAV: string[] = [];
 
 export function getMain(name: string) {
   return TAXONOMY.find((m) => m.name === name);

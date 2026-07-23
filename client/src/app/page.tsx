@@ -3,8 +3,14 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { CATEGORIES, CATEGORY_ICONS } from "@/lib/categories";
-
+import {
+  CATEGORIES,
+  CATEGORY_ICONS,
+  HIDDEN_FROM_NAV,
+  getSubs,
+  getProducts,
+  getAttributes,
+} from "@/lib/categories";
 
 type Image = { id: string; url: string };
 type Listing = {
@@ -29,6 +35,8 @@ function HomeInner() {
   const [filters, setFilters] = useState({
     query: "",
     category: "",
+    sub_category: "",
+    product_category: "",
     place: "",
     condition: "",
     ad_type: "",
@@ -36,8 +44,22 @@ function HomeInner() {
     max_price: "",
     sort_by: "newest",
   });
+  const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
   const [isSearchResult, setIsSearchResult] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  const emptyFilters = {
+    query: "",
+    category: "",
+    sub_category: "",
+    product_category: "",
+    place: "",
+    condition: "",
+    ad_type: "",
+    min_price: "",
+    max_price: "",
+    sort_by: "newest",
+  };
 
   function seedLiked(data: Listing[]) {
     const ids = new Set<string>();
@@ -59,7 +81,8 @@ function HomeInner() {
       runSearch({ query: q });
     } else {
       setIsSearchResult(false);
-      setFilters({ query: "", category: "", place: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
+      setFilters(emptyFilters);
+      setAttrFilters({});
       api("/api/listings")
         .then((data) => {
           setListings(data ?? []);
@@ -90,13 +113,16 @@ function HomeInner() {
     localStorage.removeItem("recentSearches");
   }
 
-  async function runSearch(override?: Partial<typeof filters>) {
+  async function runSearch(override?: Partial<typeof filters>, attrs?: Record<string, string>) {
     setLoading(true);
     const f = { ...filters, ...override };
     try {
       const body = {
         query: f.query,
         category: f.category,
+        sub_category: f.sub_category,
+        product_category: f.product_category,
+        attributes: attrs ?? attrFilters,
         place: f.place,
         condition: f.condition,
         ad_type: f.ad_type,
@@ -120,7 +146,8 @@ function HomeInner() {
   }
 
   async function resetAll() {
-    setFilters({ query: "", category: "", place: "", condition: "", ad_type: "", min_price: "", max_price: "", sort_by: "newest" });
+    setFilters(emptyFilters);
+    setAttrFilters({});
     setLoading(true);
     try {
       const data = await api("/api/listings");
@@ -134,8 +161,33 @@ function HomeInner() {
 
   function pickCategory(cat: string) {
     const next = filters.category === cat ? "" : cat;
-    setFilters((prev) => ({ ...prev, category: next }));
-    runSearch({ category: next });
+    setFilters((prev) => ({ ...prev, category: next, sub_category: "", product_category: "" }));
+    setAttrFilters({});
+    if (!next) {
+      resetAll();
+      return;
+    }
+    runSearch({ category: next, sub_category: "", product_category: "" }, {});
+  }
+
+  function pickSub(sub: string) {
+    const next = filters.sub_category === sub ? "" : sub;
+    setFilters((prev) => ({ ...prev, sub_category: next, product_category: "" }));
+    setAttrFilters({});
+    runSearch({ sub_category: next, product_category: "" }, {});
+  }
+
+  function pickProduct(prod: string) {
+    const next = filters.product_category === prod ? "" : prod;
+    setFilters((prev) => ({ ...prev, product_category: next }));
+    setAttrFilters({});
+    runSearch({ product_category: next }, {});
+  }
+
+  function pickAttr(key: string, value: string) {
+    const next = { ...attrFilters, [key]: value };
+    setAttrFilters(next);
+    runSearch(undefined, next);
   }
 
   async function toggleLike(e: React.MouseEvent, id: string) {
@@ -166,25 +218,71 @@ function HomeInner() {
 
   const inputClass = "w-full border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-brand";
 
+  const filterSubs = getSubs(filters.category);
+  const filterProducts = getProducts(filters.category, filters.sub_category);
+  const filterAttrs = getAttributes(filters.category, filters.sub_category, filters.product_category);
+
   return (
     <main>
       <div className="border-b border-line bg-surface">
         <div className="max-w-[1400px] mx-auto px-[5%]">
-          <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3 py-4">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => pickCategory(cat)}
-                className={`flex items-center gap-2 text-left text-xs leading-tight transition-colors ${
-                  filters.category === cat
-                    ? "text-brand font-medium"
-                    : "text-ink-secondary hover:text-brand"
-                }`}
-              >
-                <span className="text-base leading-none shrink-0">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
-                <span>{cat}</span>
-              </button>
-            ))}
+          <nav className="py-4">
+            {!filters.category ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
+                {CATEGORIES.filter((c) => !HIDDEN_FROM_NAV.includes(c)).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => pickCategory(cat)}
+                    className="flex items-center gap-2 text-left text-xs leading-tight text-ink-secondary hover:text-brand transition-colors"
+                  >
+                    <span className="text-base leading-none shrink-0">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
+                    <span>{cat}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center flex-wrap gap-1.5 text-sm mb-3">
+                  <button onClick={() => pickCategory("")} className="text-brand hover:text-brand-dark">
+                    Alle kategorier
+                  </button>
+                  <span className="text-ink-muted">/</span>
+                  {filters.sub_category ? (
+                    <>
+                      <button onClick={() => pickSub(filters.sub_category)} className="text-brand hover:text-brand-dark">
+                        {filters.category}
+                      </button>
+                      <span className="text-ink-muted">/</span>
+                      <span className="font-medium text-ink">{filters.sub_category}</span>
+                    </>
+                  ) : (
+                    <span className="font-medium text-ink">{filters.category}</span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2">
+                  {(filters.sub_category
+                    ? filterProducts.map((p) => p.name)
+                    : filterSubs.map((s) => s.name)
+                  ).map((name) => {
+                    const active = filters.sub_category
+                      ? filters.product_category === name
+                      : filters.sub_category === name;
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => (filters.sub_category ? pickProduct(name) : pickSub(name))}
+                        className={`text-left text-xs leading-tight transition-colors ${
+                          active ? "text-brand font-medium" : "text-ink-secondary hover:text-brand"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </nav>
         </div>
       </div>
@@ -196,6 +294,54 @@ function HomeInner() {
               <h2 className="font-semibold text-ink mb-4">Filtrer søk</h2>
 
               <div className="space-y-4">
+                {filterSubs.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-ink mb-1">Underkategori</label>
+                    <select
+                      value={filters.sub_category}
+                      onChange={(e) => pickSub(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Alle</option>
+                      {filterSubs.map((s) => (
+                        <option key={s.name} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {filterProducts.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-ink mb-1">Produktkategori</label>
+                    <select
+                      value={filters.product_category}
+                      onChange={(e) => pickProduct(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Alle</option>
+                      {filterProducts.map((p) => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {filterAttrs.map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-sm font-medium text-ink mb-1">{field.label}</label>
+                    <select
+                      value={attrFilters[field.key] ?? ""}
+                      onChange={(e) => pickAttr(field.key, e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Alle</option>
+                      {field.options.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+
                 <div>
                   <label className="block text-sm font-medium text-ink mb-1">Sted eller postnummer</label>
                   <input
