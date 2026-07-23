@@ -214,6 +214,20 @@ export const TAXONOMY: MainCategory[] = [
 
 // --- Lookup helpers -------------------------------------------------------
 
+export const CATEGORY_ICONS: Record<string, string> = {
+  "Antikviteter og kunst": "🖼️",
+  "Dyr og utstyr": "🐾",
+  "Elektronikk og hvitevarer": "💻",
+  "Foreldre og barn": "🧸",
+  "Fritid, hobby og underholdning": "🎸",
+  "Hage, oppussing og hus": "🔨",
+  "Klær, kosmetikk og tilbehør": "👕",
+  "Møbler og interiør": "🛋️",
+  "Næringsvirksomhet": "🏢",
+  "Sport og friluftsliv": "⚽",
+  "Utstyr til bil, båt og MC": "🚗",
+};
+
 export function getMain(name: string) {
   return TAXONOMY.find((m) => m.name === name);
 }

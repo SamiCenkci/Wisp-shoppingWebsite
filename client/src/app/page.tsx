@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORIES, CATEGORY_ICONS } from "@/lib/categories";
+
 
 type Image = { id: string; url: string };
 type Listing = {
@@ -169,18 +170,19 @@ function HomeInner() {
     <main>
       <div className="border-b border-line bg-surface">
         <div className="max-w-[1400px] mx-auto px-[5%]">
-          <nav className="flex flex-wrap gap-2 py-3">
+          <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 py-4">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => pickCategory(cat)}
-                className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
+                className={`flex flex-col items-center justify-center text-center gap-1.5 min-h-[92px] px-2 py-3 rounded-xl border transition-colors ${
                   filters.category === cat
                     ? "border-brand bg-brand-lightest text-brand"
                     : "border-line text-ink-secondary hover:border-brand hover:text-brand"
                 }`}
               >
-                {cat}
+                <span className="text-2xl leading-none">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
+                <span className="text-xs font-medium leading-tight">{cat}</span>
               </button>
             ))}
           </nav>
