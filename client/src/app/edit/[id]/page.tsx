@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { CATEGORIES } from "@/lib/categories";
+import { TAXONOMY, getSubs, getProducts, getAttributes } from "@/lib/categories";
 import AddressAutocomplete, { SelectedAddress } from "@/components/AddressAutocomplete";
 
 export default function EditListingPage() {
@@ -13,7 +13,9 @@ export default function EditListingPage() {
     title: "",
     description: "",
     price: "",
-    category: CATEGORIES[0],
+    category: "",
+    sub_category: "",
+    product_category: "",
     condition: "good",
     ad_type: "sale",
     street_address: "",
@@ -21,10 +23,15 @@ export default function EditListingPage() {
     city: "",
     county: "",
   });
+  const [attributes, setAttributes] = useState<Record<string, string>>({});
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const subs = getSubs(form.category);
+  const products = getProducts(form.category, form.sub_category);
+  const attrFields = getAttributes(form.category, form.sub_category, form.product_category);
 
   useEffect(() => {
     api(`/api/listings/${params.id}`)
@@ -34,7 +41,9 @@ export default function EditListingPage() {
           title: l.title ?? "",
           description: l.description ?? "",
           price: String((l.price_ore ?? 0) / 100),
-          category: l.category ?? CATEGORIES[0],
+          category: l.category ?? "",
+          sub_category: l.sub_category ?? "",
+          product_category: l.product_category ?? "",
           condition: l.condition ?? "good",
           ad_type: l.ad_type ?? "sale",
           street_address: l.street_address ?? "",
@@ -42,6 +51,9 @@ export default function EditListingPage() {
           city: l.municipality ?? "",
           county: l.county ?? "",
         });
+        if (l.attributes && typeof l.attributes === "object") {
+          setAttributes(l.attributes as Record<string, string>);
+        }
         if (l.latitude && l.longitude) {
           setCoords({ lat: l.latitude, lon: l.longitude });
         }
@@ -52,6 +64,19 @@ export default function EditListingPage() {
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function pickMain(value: string) {
+    setForm((prev) => ({ ...prev, category: value, sub_category: "", product_category: "" }));
+    setAttributes({});
+  }
+  function pickSub(value: string) {
+    setForm((prev) => ({ ...prev, sub_category: value, product_category: "" }));
+    setAttributes({});
+  }
+  function pickProduct(value: string) {
+    setForm((prev) => ({ ...prev, product_category: value }));
+    setAttributes({});
   }
 
   function onAddressSelect(addr: SelectedAddress) {
@@ -77,6 +102,9 @@ export default function EditListingPage() {
           description: form.description,
           price_ore: form.ad_type === "giveaway" ? 0 : Math.round(parseFloat(form.price || "0") * 100),
           category: form.category,
+          sub_category: form.sub_category,
+          product_category: form.product_category,
+          attributes,
           condition: form.condition,
           county: form.county || "Norge",
           municipality: form.city || form.postal_code,
@@ -155,6 +183,62 @@ export default function EditListingPage() {
           />
         </div>
 
+        {/* Category hierarchy */}
+        <div className="space-y-3 border border-line rounded-xl p-4">
+          <div>
+            <label className={labelClass}>Hovedkategori</label>
+            <select value={form.category} onChange={(e) => pickMain(e.target.value)} required className={inputClass}>
+              <option value="">Velg...</option>
+              {TAXONOMY.map((m) => (
+                <option key={m.name} value={m.name}>{m.name}</option>
+              ))}
+              {form.category && !TAXONOMY.some((m) => m.name === form.category) && (
+                <option value={form.category}>{form.category} (gammel kategori)</option>
+              )}
+            </select>
+          </div>
+
+          {subs.length > 0 && (
+            <div>
+              <label className={labelClass}>Underkategori</label>
+              <select value={form.sub_category} onChange={(e) => pickSub(e.target.value)} className={inputClass}>
+                <option value="">Velg...</option>
+                {subs.map((s) => (
+                  <option key={s.name} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {products.length > 0 && (
+            <div>
+              <label className={labelClass}>Produktkategori</label>
+              <select value={form.product_category} onChange={(e) => pickProduct(e.target.value)} className={inputClass}>
+                <option value="">Velg...</option>
+                {products.map((p) => (
+                  <option key={p.name} value={p.name}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {attrFields.map((field) => (
+            <div key={field.key}>
+              <label className={labelClass}>{field.label}</label>
+              <select
+                value={attributes[field.key] ?? ""}
+                onChange={(e) => setAttributes((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                className={inputClass}
+              >
+                <option value="">Velg...</option>
+                {field.options.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+
         <div>
           <label className={labelClass}>Adresse</label>
           <AddressAutocomplete
@@ -202,16 +286,6 @@ export default function EditListingPage() {
               <option value="like_new">Som ny</option>
               <option value="good">God</option>
               <option value="fair">Brukbar</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Kategori</label>
-            <select value={form.category} onChange={(e) => update("category", e.target.value)} className={inputClass}>
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
             </select>
           </div>
         </div>

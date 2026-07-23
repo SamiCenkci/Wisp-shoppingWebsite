@@ -15,6 +15,14 @@ const conditionLabels: Record<string, string> = {
   fair: "Brukbar",
 };
 
+const attrLabels: Record<string, string> = {
+  plattform: "Plattform",
+  storrelse: "Størrelse",
+  skostorrelse: "Skostørrelse",
+  drivstoff: "Drivstoff",
+  sykkeltype: "Type sykkel",
+};
+
 type Image = { id: string; url: string };
 type Listing = {
   id: string;
@@ -34,6 +42,9 @@ type Listing = {
   latitude?: number;
   longitude?: number;
   street_address?: string;
+  sub_category?: string;
+  product_category?: string;
+  attributes?: Record<string, string>;
 };
 type Seller = {
   id: string;
@@ -220,12 +231,31 @@ export default function ListingDetailPage() {
             <span>{likeCount} liker</span>
           </button>
 
-          <div className="flex gap-2 mt-4 text-sm">
+          <div className="flex flex-wrap gap-2 mt-4 text-sm">
             <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{listing.category}</span>
+            {listing.sub_category && (
+              <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{listing.sub_category}</span>
+            )}
+            {listing.product_category && (
+              <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{listing.product_category}</span>
+            )}
             <span className="bg-subtle text-ink-secondary rounded-full px-3 py-1">
               {conditionLabels[listing.condition] ?? listing.condition}
             </span>
           </div>
+
+          {listing.attributes && Object.keys(listing.attributes).length > 0 && (
+            <dl className="mt-5 border border-line rounded-xl divide-y divide-line text-sm">
+              {Object.entries(listing.attributes).map(([key, value]) =>
+                value ? (
+                  <div key={key} className="flex justify-between px-4 py-2.5">
+                    <dt className="text-ink-secondary capitalize">{attrLabels[key] ?? key}</dt>
+                    <dd className="text-ink font-medium">{value}</dd>
+                  </div>
+                ) : null
+              )}
+            </dl>
+          )}
           <p className="mt-5 text-ink whitespace-pre-wrap">{listing.description}</p>
           <div className="mt-5 pt-5 border-t border-line text-sm text-ink-secondary space-y-1">
             <p>📍 {listing.municipality}, {listing.county}</p>

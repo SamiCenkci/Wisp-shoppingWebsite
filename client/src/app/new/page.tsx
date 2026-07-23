@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { CATEGORIES } from "@/lib/categories";
+import { TAXONOMY, getSubs, getProducts, getAttributes } from "@/lib/categories";
 import AddressAutocomplete, { SelectedAddress } from "@/components/AddressAutocomplete";
 
 export default function NewListingPage() {
@@ -12,7 +12,9 @@ export default function NewListingPage() {
     title: "",
     description: "",
     price: "",
-    category: CATEGORIES[0],
+    category: "",
+    sub_category: "",
+    product_category: "",
     condition: "good",
     ad_type: "sale",
     street_address: "",
@@ -20,14 +22,33 @@ export default function NewListingPage() {
     city: "",
     county: "",
   });
+  const [attributes, setAttributes] = useState<Record<string, string>>({});
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const subs = getSubs(form.category);
+  const products = getProducts(form.category, form.sub_category);
+  const attrFields = getAttributes(form.category, form.sub_category, form.product_category);
+
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  // Changing a level clears everything below it
+  function pickMain(value: string) {
+    setForm((prev) => ({ ...prev, category: value, sub_category: "", product_category: "" }));
+    setAttributes({});
+  }
+  function pickSub(value: string) {
+    setForm((prev) => ({ ...prev, sub_category: value, product_category: "" }));
+    setAttributes({});
+  }
+  function pickProduct(value: string) {
+    setForm((prev) => ({ ...prev, product_category: value }));
+    setAttributes({});
   }
 
   function onAddressSelect(addr: SelectedAddress) {
@@ -59,6 +80,10 @@ export default function NewListingPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!form.category) {
+      setError("Velg en hovedkategori.");
+      return;
+    }
     if (!form.postal_code) {
       setError("Velg en adresse fra listen så postnummer fylles ut automatisk.");
       return;
@@ -74,11 +99,15 @@ export default function NewListingPage() {
           description: form.description,
           price_ore: form.ad_type === "giveaway" ? 0 : Math.round(parseFloat(form.price || "0") * 100),
           category: form.category,
+          sub_category: form.sub_category,
+          product_category: form.product_category,
+          attributes,
           condition: form.condition,
           county: form.county || "Norge",
           municipality: form.city || form.postal_code,
           ad_type: form.ad_type,
           street_address: form.street_address,
+          postal_code: form.postal_code,
           latitude: coords?.lat ?? 0,
           longitude: coords?.lon ?? 0,
           images: imageUrls,
@@ -170,6 +199,59 @@ export default function NewListingPage() {
               <textarea value={form.description} onChange={(e) => update("description", e.target.value)} required rows={5} className={inputClass} placeholder="Beskriv varen din..." />
             </div>
 
+            {/* Category hierarchy */}
+            <div className="space-y-3 border border-line rounded-xl p-4">
+              <div>
+                <label className={labelClass}>Hovedkategori</label>
+                <select value={form.category} onChange={(e) => pickMain(e.target.value)} required className={inputClass}>
+                  <option value="">Velg...</option>
+                  {TAXONOMY.map((m) => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {subs.length > 0 && (
+                <div>
+                  <label className={labelClass}>Underkategori</label>
+                  <select value={form.sub_category} onChange={(e) => pickSub(e.target.value)} className={inputClass}>
+                    <option value="">Velg...</option>
+                    {subs.map((s) => (
+                      <option key={s.name} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {products.length > 0 && (
+                <div>
+                  <label className={labelClass}>Produktkategori</label>
+                  <select value={form.product_category} onChange={(e) => pickProduct(e.target.value)} className={inputClass}>
+                    <option value="">Velg...</option>
+                    {products.map((p) => (
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {attrFields.map((field) => (
+                <div key={field.key}>
+                  <label className={labelClass}>{field.label}</label>
+                  <select
+                    value={attributes[field.key] ?? ""}
+                    onChange={(e) => setAttributes((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className={inputClass}
+                  >
+                    <option value="">Velg...</option>
+                    {field.options.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+
             <div>
               <label className={labelClass}>Adresse</label>
               <AddressAutocomplete
@@ -218,14 +300,6 @@ export default function NewListingPage() {
                   <option value="like_new">Som ny</option>
                   <option value="good">God</option>
                   <option value="fair">Brukbar</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Kategori</label>
-                <select value={form.category} onChange={(e) => update("category", e.target.value)} className={inputClass}>
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
                 </select>
               </div>
             </div>

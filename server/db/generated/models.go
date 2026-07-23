@@ -24,25 +24,29 @@ type Favorite struct {
 }
 
 type Listing struct {
-	ID            pgtype.UUID        `json:"id"`
-	UserID        pgtype.UUID        `json:"user_id"`
-	Title         string             `json:"title"`
-	Description   string             `json:"description"`
-	PriceOre      int32              `json:"price_ore"`
-	Category      string             `json:"category"`
-	Subcategory   pgtype.Text        `json:"subcategory"`
-	Condition     string             `json:"condition"`
-	County        string             `json:"county"`
-	Municipality  string             `json:"municipality"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	Status        string             `json:"status"`
-	AdType        string             `json:"ad_type"`
-	ViewCount     int32              `json:"view_count"`
-	SoldTo        pgtype.UUID        `json:"sold_to"`
-	Latitude      pgtype.Float8      `json:"latitude"`
-	Longitude     pgtype.Float8      `json:"longitude"`
-	StreetAddress string             `json:"street_address"`
+	ID              pgtype.UUID        `json:"id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	PriceOre        int32              `json:"price_ore"`
+	Category        string             `json:"category"`
+	Subcategory     pgtype.Text        `json:"subcategory"`
+	Condition       string             `json:"condition"`
+	County          string             `json:"county"`
+	Municipality    string             `json:"municipality"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	Status          string             `json:"status"`
+	AdType          string             `json:"ad_type"`
+	ViewCount       int32              `json:"view_count"`
+	SoldTo          pgtype.UUID        `json:"sold_to"`
+	Latitude        pgtype.Float8      `json:"latitude"`
+	Longitude       pgtype.Float8      `json:"longitude"`
+	StreetAddress   string             `json:"street_address"`
+	PostalCode      string             `json:"postal_code"`
+	SubCategory     string             `json:"sub_category"`
+	ProductCategory string             `json:"product_category"`
+	Attributes      []byte             `json:"attributes"`
 }
 
 type ListingImage struct {

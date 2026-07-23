@@ -2,6 +2,7 @@ package listing
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -21,20 +22,23 @@ type Handler struct {
 }
 
 type createRequest struct {
-	Title         string   `json:"title" binding:"required"`
-	Description   string   `json:"description" binding:"required"`
-	PriceOre      int32    `json:"price_ore" binding:"required,min=0"`
-	Category      string   `json:"category" binding:"required"`
-	Subcategory   string   `json:"subcategory"`
-	Condition     string   `json:"condition" binding:"required"`
-	County        string   `json:"county" binding:"required"`
-	Municipality  string   `json:"municipality" binding:"required"`
-	AdType        string   `json:"ad_type"`
-	StreetAddress string   `json:"street_address"`
-	Latitude      float64  `json:"latitude"`
-	Longitude     float64  `json:"longitude"`
-	PostalCode    string   `json:"postal_code"`
-	Images        []string `json:"images"`
+	Title           string            `json:"title" binding:"required"`
+	Description     string            `json:"description" binding:"required"`
+	PriceOre        int32             `json:"price_ore" binding:"required,min=0"`
+	Category        string            `json:"category" binding:"required"`
+	Subcategory     string            `json:"subcategory"`
+	Condition       string            `json:"condition" binding:"required"`
+	County          string            `json:"county" binding:"required"`
+	Municipality    string            `json:"municipality" binding:"required"`
+	AdType          string            `json:"ad_type"`
+	StreetAddress   string            `json:"street_address"`
+	Latitude        float64           `json:"latitude"`
+	Longitude       float64           `json:"longitude"`
+	PostalCode      string            `json:"postal_code"`
+	SubCategory     string            `json:"sub_category"`
+	ProductCategory string            `json:"product_category"`
+	Attributes      map[string]string `json:"attributes"`
+	Images          []string          `json:"images"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -57,19 +61,22 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	listing, err := h.Queries.CreateListing(context.Background(), db.CreateListingParams{
-		UserID:        pgUUID(userID),
-		Title:         req.Title,
-		Description:   req.Description,
-		PriceOre:      req.PriceOre,
-		Category:      req.Category,
-		Subcategory:   pgText(req.Subcategory),
-		Condition:     req.Condition,
-		County:        req.County,
-		Municipality:  req.Municipality,
-		AdType:        adType,
-		StreetAddress: req.StreetAddress,
-		Latitude:      pgFloat8(req.Latitude),
-		Longitude:     pgFloat8(req.Longitude),
+		UserID:          pgUUID(userID),
+		Title:           req.Title,
+		Description:     req.Description,
+		PriceOre:        req.PriceOre,
+		Category:        req.Category,
+		Subcategory:     pgText(req.Subcategory),
+		Condition:       req.Condition,
+		County:          req.County,
+		Municipality:    req.Municipality,
+		AdType:          adType,
+		StreetAddress:   req.StreetAddress,
+		Latitude:        pgFloat8(req.Latitude),
+		Longitude:       pgFloat8(req.Longitude),
+		SubCategory:     req.SubCategory,
+		ProductCategory: req.ProductCategory,
+		Attributes:      attrsJSON(req.Attributes),
 	})
 
 	if err != nil {
@@ -216,18 +223,21 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 
 	updated, err := h.Queries.UpdateListing(context.Background(), db.UpdateListingParams{
-		ID:            pgUUID(id),
-		Title:         req.Title,
-		Description:   req.Description,
-		PriceOre:      req.PriceOre,
-		Category:      req.Category,
-		Subcategory:   pgText(req.Subcategory),
-		Condition:     req.Condition,
-		County:        req.County,
-		Municipality:  req.Municipality,
-		StreetAddress: req.StreetAddress,
-		Latitude:      pgFloat8(req.Latitude),
-		Longitude:     pgFloat8(req.Longitude),
+		ID:              pgUUID(id),
+		Title:           req.Title,
+		Description:     req.Description,
+		PriceOre:        req.PriceOre,
+		Category:        req.Category,
+		Subcategory:     pgText(req.Subcategory),
+		Condition:       req.Condition,
+		County:          req.County,
+		Municipality:    req.Municipality,
+		StreetAddress:   req.StreetAddress,
+		Latitude:        pgFloat8(req.Latitude),
+		Longitude:       pgFloat8(req.Longitude),
+		SubCategory:     req.SubCategory,
+		ProductCategory: req.ProductCategory,
+		Attributes:      attrsJSON(req.Attributes),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -466,6 +476,18 @@ func pgFloat8(f float64) pgtype.Float8 {
 		return pgtype.Float8{Valid: false}
 	}
 	return pgtype.Float8{Float64: f, Valid: true}
+}
+
+// attrsJSON encodes the attribute map for the JSONB column.
+func attrsJSON(m map[string]string) []byte {
+	if m == nil {
+		m = map[string]string{}
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
 }
 
 // likedSet returns the set of listing IDs the given user has favorited.
