@@ -46,6 +46,7 @@ type Listing = {
   sub_category?: string;
   product_category?: string;
   attributes?: Record<string, string>;
+  deleted_at?: string | null;
 };
 type Seller = {
   id: string;
@@ -180,6 +181,33 @@ export default function ListingDetailPage() {
   if (loading) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
   if (error) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-red-600">{error}</p>;
   if (!listing) return <p className="max-w-3xl mx-auto px-[5%] py-10">Annonse ikke funnet.</p>;
+  
+  if (listing.deleted_at) {
+    return (
+      <main className="max-w-2xl mx-auto px-[5%] py-16 text-center">
+        <div className="text-5xl mb-4">🗑️</div>
+        <h1 className="text-2xl font-bold text-ink mb-2">Annonsen er slettet</h1>
+        <p className="text-ink-secondary mb-8">
+          &laquo;{listing.title}&raquo; er ikke lenger tilgjengelig. Meldingene dine om annonsen er
+          fortsatt bevart.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={() => router.push("/")}
+            className="px-5 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark"
+          >
+            Se andre annonser
+          </button>
+          <button
+            onClick={() => router.push("/chat")}
+            className="px-5 py-2.5 rounded-xl border border-line text-ink-secondary font-medium hover:border-brand hover:text-brand"
+          >
+            Gå til meldinger
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="max-w-[1100px] mx-auto px-[5%] py-8">

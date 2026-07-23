@@ -291,7 +291,7 @@ func (h *Handler) Search(c *gin.Context) {
 		return
 	}
 
-	sql := "SELECT * FROM listings WHERE status = 'active' AND created_at > NOW() - INTERVAL '60 days'"
+	sql := "SELECT * FROM listings WHERE status = 'active' AND deleted_at IS NULL AND created_at > NOW() - INTERVAL '60 days'"
 	args := []interface{}{}
 	argN := 1
 

@@ -9,13 +9,14 @@ SELECT * FROM listings WHERE id = $1;
 -- name: ListListings :many
 SELECT * FROM listings
 WHERE status = 'active'
+  AND deleted_at IS NULL
   AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: ListListingsByUser :many
 SELECT * FROM listings
-WHERE user_id = $1
+WHERE user_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC;
 
 -- name: UpdateListing :one
@@ -29,15 +30,7 @@ WHERE id = $1
 RETURNING *;
 
 -- name: DeleteListing :exec
-DELETE FROM listings WHERE id = $1;
-
--- name: GetSimilarListings :many
-SELECT * FROM listings
-WHERE category = $1 AND id != $2
-  AND status = 'active'
-  AND created_at > NOW() - INTERVAL '60 days'
-ORDER BY created_at DESC
-LIMIT 4;
+UPDATE listings SET deleted_at = NOW() WHERE id = $1;
 
 -- name: UpdateListingStatus :exec
 UPDATE listings SET status = $2 WHERE id = $1;
@@ -47,3 +40,12 @@ UPDATE listings SET status = 'sold', sold_to = $2 WHERE id = $1;
 
 -- name: IncrementViewCount :exec
 UPDATE listings SET view_count = view_count + 1 WHERE id = $1;
+
+-- name: GetSimilarListings :many
+SELECT * FROM listings
+WHERE category = $1 AND id != $2
+  AND status = 'active'
+  AND deleted_at IS NULL
+  AND created_at > NOW() - INTERVAL '60 days'
+ORDER BY created_at DESC
+LIMIT 4;

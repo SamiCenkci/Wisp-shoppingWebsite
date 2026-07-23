@@ -47,6 +47,7 @@ type Listing struct {
 	SubCategory     string             `json:"sub_category"`
 	ProductCategory string             `json:"product_category"`
 	Attributes      []byte             `json:"attributes"`
+	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type ListingImage struct {

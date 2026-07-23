@@ -20,5 +20,5 @@ SELECT listing_id FROM favorites WHERE user_id = $1;
 -- name: ListFavoriteListingsByUser :many
 SELECT l.* FROM listings l
 JOIN favorites f ON f.listing_id = l.id
-WHERE f.user_id = $1
+WHERE f.user_id = $1 AND l.deleted_at IS NULL
 ORDER BY f.created_at DESC;

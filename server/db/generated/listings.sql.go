@@ -14,7 +14,7 @@ import (
 const createListing = `-- name: CreateListing :one
 INSERT INTO listings (user_id, title, description, price_ore, category, subcategory, condition, county, municipality, ad_type, street_address, postal_code, latitude, longitude, sub_category, product_category, attributes)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes
+RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at
 `
 
 type CreateListingParams struct {
@@ -82,12 +82,13 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (L
 		&i.SubCategory,
 		&i.ProductCategory,
 		&i.Attributes,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const deleteListing = `-- name: DeleteListing :exec
-DELETE FROM listings WHERE id = $1
+UPDATE listings SET deleted_at = NOW() WHERE id = $1
 `
 
 func (q *Queries) DeleteListing(ctx context.Context, id pgtype.UUID) error {
@@ -96,7 +97,7 @@ func (q *Queries) DeleteListing(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getListingByID = `-- name: GetListingByID :one
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes FROM listings WHERE id = $1
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at FROM listings WHERE id = $1
 `
 
 func (q *Queries) GetListingByID(ctx context.Context, id pgtype.UUID) (Listing, error) {
@@ -126,14 +127,16 @@ func (q *Queries) GetListingByID(ctx context.Context, id pgtype.UUID) (Listing, 
 		&i.SubCategory,
 		&i.ProductCategory,
 		&i.Attributes,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getSimilarListings = `-- name: GetSimilarListings :many
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes FROM listings
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at FROM listings
 WHERE category = $1 AND id != $2
   AND status = 'active'
+  AND deleted_at IS NULL
   AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC
 LIMIT 4
@@ -177,6 +180,7 @@ func (q *Queries) GetSimilarListings(ctx context.Context, arg GetSimilarListings
 			&i.SubCategory,
 			&i.ProductCategory,
 			&i.Attributes,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -198,8 +202,9 @@ func (q *Queries) IncrementViewCount(ctx context.Context, id pgtype.UUID) error 
 }
 
 const listListings = `-- name: ListListings :many
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes FROM listings
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at FROM listings
 WHERE status = 'active'
+  AND deleted_at IS NULL
   AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
@@ -243,6 +248,7 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 			&i.SubCategory,
 			&i.ProductCategory,
 			&i.Attributes,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -255,8 +261,8 @@ func (q *Queries) ListListings(ctx context.Context, arg ListListingsParams) ([]L
 }
 
 const listListingsByUser = `-- name: ListListingsByUser :many
-SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes FROM listings
-WHERE user_id = $1
+SELECT id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at FROM listings
+WHERE user_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
 
@@ -293,6 +299,7 @@ func (q *Queries) ListListingsByUser(ctx context.Context, userID pgtype.UUID) ([
 			&i.SubCategory,
 			&i.ProductCategory,
 			&i.Attributes,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -326,7 +333,7 @@ SET title = $2, description = $3, price_ore = $4, category = $5,
     sub_category = $14, product_category = $15, attributes = $16,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes
+RETURNING id, user_id, title, description, price_ore, category, subcategory, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at
 `
 
 type UpdateListingParams struct {
@@ -392,6 +399,7 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (L
 		&i.SubCategory,
 		&i.ProductCategory,
 		&i.Attributes,
+		&i.DeletedAt,
 	)
 	return i, err
 }

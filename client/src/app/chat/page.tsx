@@ -15,6 +15,7 @@ type Conversation = {
   listing_image: string;
   last_message: string;
   unread: number;
+  listing_deleted?: boolean;
 };
 type Message = {
   id: string;

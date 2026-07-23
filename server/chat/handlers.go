@@ -86,11 +86,12 @@ func (h *Handler) List(c *gin.Context) {
 
 	type enriched struct {
 		db.Conversation
-		OtherName    string `json:"other_name"`
-		ListingTitle string `json:"listing_title"`
-		ListingImage string `json:"listing_image"`
-		LastMessage  string `json:"last_message"`
-		Unread       int64  `json:"unread"`
+		OtherName      string `json:"other_name"`
+		ListingTitle   string `json:"listing_title"`
+		ListingImage   string `json:"listing_image"`
+		LastMessage    string `json:"last_message"`
+		Unread         int64  `json:"unread"`
+		ListingDeleted bool   `json:"listing_deleted"`
 	}
 
 	out := make([]enriched, 0, len(convs))
@@ -110,6 +111,7 @@ func (h *Handler) List(c *gin.Context) {
 
 		if listing, err := h.Queries.GetListingByID(context.Background(), conv.ListingID); err == nil {
 			e.ListingTitle = listing.Title
+			e.ListingDeleted = listing.DeletedAt.Valid
 			if imgs, err := h.Queries.GetImagesByListing(context.Background(), conv.ListingID); err == nil && len(imgs) > 0 {
 				e.ListingImage = imgs[0].Url
 			}
