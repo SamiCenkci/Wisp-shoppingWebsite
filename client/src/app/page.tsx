@@ -170,19 +170,19 @@ function HomeInner() {
     <main>
       <div className="border-b border-line bg-surface">
         <div className="max-w-[1400px] mx-auto px-[5%]">
-          <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 py-4">
+          <nav className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3 py-4">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => pickCategory(cat)}
-                className={`flex flex-col items-center justify-center text-center gap-1.5 min-h-[92px] px-2 py-3 rounded-xl border transition-colors ${
+                className={`flex items-center gap-2 text-left text-xs leading-tight transition-colors ${
                   filters.category === cat
-                    ? "border-brand bg-brand-lightest text-brand"
-                    : "border-line text-ink-secondary hover:border-brand hover:text-brand"
+                    ? "text-brand font-medium"
+                    : "text-ink-secondary hover:text-brand"
                 }`}
               >
-                <span className="text-2xl leading-none">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
-                <span className="text-xs font-medium leading-tight">{cat}</span>
+                <span className="text-base leading-none shrink-0">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
+                <span>{cat}</span>
               </button>
             ))}
           </nav>
