@@ -283,7 +283,7 @@ function HomeInner() {
       </div>
 
       <div className="max-w-[1400px] mx-auto px-[5%] py-8 flex gap-8">
-        {isSearchResult && (
+        {(isSearchResult || filters.category) && (
           <aside className="w-64 shrink-0 hidden lg:block">
             <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm sticky top-24">
               <h2 className="font-semibold text-ink mb-4">Filtrer søk</h2>
@@ -411,12 +411,12 @@ function HomeInner() {
         <section className="flex-1">
           <div className="flex items-center justify-between mb-5">
             <h1 className="text-xl font-semibold text-ink">
-              {isSearchResult ? "Søkeresultater" : "Siste annonser"}
+              {isSearchResult || filters.category ? "Søkeresultater" : "Siste annonser"}
               <span className="text-ink-muted font-normal text-base ml-2">
                 ({listings.length})
               </span>
             </h1>
-            {isSearchResult && (
+            {(isSearchResult || filters.category) && (
               <button onClick={resetAll} className="text-sm text-ink-secondary hover:text-brand underline">
                 Vis alle annonser
               </button>
