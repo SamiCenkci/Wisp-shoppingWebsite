@@ -109,4 +109,12 @@ type User struct {
 	PostalCode    string             `json:"postal_code"`
 	City          string             `json:"city"`
 	Country       string             `json:"country"`
+	VerifiedAt    pgtype.Timestamptz `json:"verified_at"`
+}
+
+type VerificationToken struct {
+	Token     string             `json:"token"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }

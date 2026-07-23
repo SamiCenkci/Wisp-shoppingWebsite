@@ -5,24 +5,32 @@ import (
 	"net/http"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/email"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
 	Queries   *db.Queries
 	JWTSecret string
+	Email     *email.Sender
+}
+
+func pgUUID(id uuid.UUID) pgtype.UUID {
+	return pgtype.UUID{Bytes: id, Valid: true}
 }
 
 // ── Request body shapes ──
 type registerRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email,max=254"`
+	Password string `json:"password" binding:"required,min=8,max=200"`
+	Name     string `json:"name" binding:"required,max=60"`
 }
 
 type loginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email    string `json:"email" binding:"required,email,max=254"`
+	Password string `json:"password" binding:"required,max=200"`
 }
 
 // ── POST /api/auth/signup ──
@@ -48,6 +56,9 @@ func (h *Handler) Register(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "email already in use"})
 		return
 	}
+
+	// Send the confirmation link. Runs in the background and never fails signup.
+	h.IssueVerification(uuid.UUID(user.ID.Bytes), user.Email, user.Name)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":    user.ID,
@@ -83,6 +94,11 @@ func (h *Handler) Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
-		"user":  gin.H{"id": user.ID, "email": user.Email, "name": user.Name},
+		"user": gin.H{
+			"id":       user.ID,
+			"email":    user.Email,
+			"name":     user.Name,
+			"verified": user.VerifiedAt.Valid,
+		},
 	})
 }

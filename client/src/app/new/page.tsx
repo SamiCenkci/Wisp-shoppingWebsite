@@ -32,6 +32,7 @@ export default function NewListingPage() {
   const subs = getSubs(form.category);
   const products = getProducts(form.category, form.sub_category);
   const attrFields = getAttributes(form.category, form.sub_category, form.product_category);
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -68,6 +69,9 @@ export default function NewListingPage() {
   }
 
   async function uploadFile(file: File): Promise<string> {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      throw new Error(`${file.name} er for stor. Maks 10 MB per bilde.`);
+    }
     const { upload_url, public_url } = await api("/api/uploads/presign", {
       method: "POST",
       body: JSON.stringify({ file_name: file.name, content_type: file.type }),

@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, name)
 VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country
+RETURNING id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country, verified_at
 `
 
 type CreateUserParams struct {
@@ -43,12 +43,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PostalCode,
 		&i.City,
 		&i.Country,
+		&i.VerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country FROM users WHERE email = $1
+SELECT id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country, verified_at FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -71,12 +72,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PostalCode,
 		&i.City,
 		&i.Country,
+		&i.VerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country FROM users WHERE id = $1
+SELECT id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country, verified_at FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -99,6 +101,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.PostalCode,
 		&i.City,
 		&i.Country,
+		&i.VerifiedAt,
 	)
 	return i, err
 }
@@ -178,7 +181,7 @@ UPDATE users SET
   city = $11,
   country = $12
 WHERE id = $1
-RETURNING id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country
+RETURNING id, email, password_hash, name, avatar_url, email_verified, created_at, display_name, bio, phone, birth_year, gender, street_address, postal_code, city, country, verified_at
 `
 
 type UpdateProfileParams struct {
@@ -229,6 +232,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (U
 		&i.PostalCode,
 		&i.City,
 		&i.Country,
+		&i.VerifiedAt,
 	)
 	return i, err
 }

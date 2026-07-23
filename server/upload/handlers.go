@@ -38,9 +38,9 @@ var allowedTypes = map[string]bool{
 	"application/pdf": true,
 }
 
-// Uploads are capped at 10 MB. This is enforced by S3 itself via the presigned
-// conditions — checking it here would be pointless, since the browser PUTs
-// directly to S3 and never passes through this server.
+// Uploads are capped at 10 MB. The browser PUTs directly to S3 without passing
+// through this server, so the cap is enforced by a bucket policy denying
+// oversized objects; the client checks size first for a friendlier error.
 const maxUploadBytes = 10 * 1024 * 1024
 
 // safeFileName strips any path components and dangerous characters so a crafted
@@ -105,10 +105,9 @@ func (h *Handler) Presign(c *gin.Context) {
 	key := fmt.Sprintf("listings/%s-%s", uuid.New().String(), safeFileName(req.FileName))
 
 	presigned, err := presigner.PresignPutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:        aws.String(h.Bucket),
-		Key:           aws.String(key),
-		ContentType:   aws.String(req.ContentType),
-		ContentLength: aws.Int64(maxUploadBytes),
+		Bucket:      aws.String(h.Bucket),
+		Key:         aws.String(key),
+		ContentType: aws.String(req.ContentType),
 	}, s3.WithPresignExpires(5*time.Minute))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

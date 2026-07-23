@@ -138,3 +138,29 @@ func (s *Sender) SendPriceDropAlert(toEmail, name, listingTitle, listingID strin
 
 	go s.send(toEmail, "Prisen har gått ned på en annonse du følger", html)
 }
+
+// SendVerificationEmail asks a new user to confirm their address.
+func (s *Sender) SendVerificationEmail(toEmail, name, token string) {
+	verifyURL := fmt.Sprintf("%s/verify?token=%s", s.SiteURL, token)
+
+	html := fmt.Sprintf(`
+<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1a1a1a">
+  <div style="font-size:26px;font-weight:700;color:#1A9E4B;margin-bottom:24px">Wisp</div>
+
+  <h1 style="font-size:22px;margin:0 0 12px">Velkommen, %s!</h1>
+
+  <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 24px">
+    Bekreft e-postadressen din for å komme i gang med å legge ut annonser og sende meldinger.
+  </p>
+
+  <a href="%s" style="display:inline-block;background:#1A9E4B;color:#fff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:600;font-size:15px">
+    Bekreft e-postadressen
+  </a>
+
+  <p style="font-size:13px;color:#999;margin-top:24px">
+    Lenken er gyldig i 24 timer. Har du ikke opprettet en konto på Wisp, kan du se bort fra denne e-posten.
+  </p>
+</div>`, name, verifyURL)
+
+	go s.send(toEmail, "Bekreft e-postadressen din på Wisp", html)
+}

@@ -23,14 +23,15 @@ func main() {
 
 	queries := dbgen.New(pool)
 
-	authHandler := &auth.Handler{
-		Queries:   queries,
-		JWTSecret: cfg.JWTSecret,
-	}
-
 	mailer := &email.Sender{
 		APIKey:  cfg.ResendAPIKey,
 		SiteURL: "https://wispapp.net",
+	}
+
+	authHandler := &auth.Handler{
+		Queries:   queries,
+		JWTSecret: cfg.JWTSecret,
+		Email:     mailer,
 	}
 
 	listingHandler := &listing.Handler{Queries: queries, Pool: pool, Email: mailer}
@@ -69,8 +70,11 @@ func main() {
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
+
 		api.POST("/auth/signup", signupLimiter.Middleware(), authHandler.Register)
 		api.POST("/auth/login", loginLimiter.Middleware(), authHandler.Login)
+		api.GET("/auth/verify", authHandler.Verify)
+		api.POST("/auth/resend-verification", auth.RequireAuth(cfg.JWTSecret), authHandler.ResendVerification)
 
 		api.GET("/me", auth.RequireAuth(cfg.JWTSecret), func(c *gin.Context) {
 			c.JSON(200, gin.H{"user_id": c.GetString("userID")})
@@ -80,7 +84,7 @@ func main() {
 		api.GET("/listings/mine", auth.RequireAuth(cfg.JWTSecret), listingHandler.Mine)
 		api.POST("/listings/search", auth.OptionalAuth(cfg.JWTSecret), listingHandler.Search)
 		api.GET("/listings/:id", auth.OptionalAuth(cfg.JWTSecret), listingHandler.GetOne)
-		api.POST("/listings", listingLimiter.Middleware(), auth.RequireAuth(cfg.JWTSecret), listingHandler.Create)
+		api.POST("/listings", listingLimiter.Middleware(), auth.RequireAuth(cfg.JWTSecret), auth.RequireVerified(queries), listingHandler.Create)
 		api.PUT("/listings/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.Update)
 		api.DELETE("/listings/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.Delete)
 		api.PUT("/listings/:id/status", auth.RequireAuth(cfg.JWTSecret), listingHandler.SetStatus)
@@ -90,11 +94,11 @@ func main() {
 		api.GET("/users/:id", userHandler.GetProfile)
 		api.PUT("/users/me", auth.RequireAuth(cfg.JWTSecret), userHandler.UpdateMe)
 
-		api.POST("/conversations", auth.RequireAuth(cfg.JWTSecret), chatHandler.Start)
+		api.POST("/conversations", auth.RequireAuth(cfg.JWTSecret), auth.RequireVerified(queries), chatHandler.Start)
 		api.GET("/conversations", auth.RequireAuth(cfg.JWTSecret), chatHandler.List)
 		api.GET("/conversations/:id/messages", auth.RequireAuth(cfg.JWTSecret), chatHandler.Messages)
 		api.GET("/messages/unread-count", auth.RequireAuth(cfg.JWTSecret), chatHandler.UnreadCount)
-		api.POST("/conversations/:id/messages", auth.RequireAuth(cfg.JWTSecret), chatHandler.Send)
+		api.POST("/conversations/:id/messages", auth.RequireAuth(cfg.JWTSecret), auth.RequireVerified(queries), chatHandler.Send)
 		api.GET("/ws", auth.RequireAuthWS(cfg.JWTSecret), chatHandler.WebSocket)
 
 		api.POST("/listings/:id/favorite", auth.RequireAuth(cfg.JWTSecret), listingHandler.AddFavorite)

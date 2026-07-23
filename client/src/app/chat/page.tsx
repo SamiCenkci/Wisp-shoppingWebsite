@@ -142,15 +142,25 @@ function ChatInner() {
   }, [messages]);
 
   async function onFilePick(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Filen er for stor. Maks 10 MB.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    if (!file.type) {
+      alert("Kunne ikke gjenkjenne filtypen. Prøv en JPG, PNG, GIF, WEBP eller PDF.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const { upload_url, public_url } = await api("/api/uploads/presign", {
         method: "POST",
-        body: JSON.stringify({ file_name: file.name, content_type: file.type || "application/octet-stream" }),
+        body: JSON.stringify({ file_name: file.name, content_type: file.type }),
       });
       const res = await fetch(upload_url, {
         method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
+        headers: { "Content-Type": file.type },
         body: file,
       });
       if (!res.ok) throw new Error("Opplasting feilet");
@@ -162,7 +172,7 @@ function ChatInner() {
       if (fileRef.current) fileRef.current.value = "";
     }
   }
-
+  
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if ((!text.trim() && !attachment) || !activeId) return;
