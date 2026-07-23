@@ -72,6 +72,7 @@ func (h *Handler) Create(c *gin.Context) {
 		Municipality:    req.Municipality,
 		AdType:          adType,
 		StreetAddress:   req.StreetAddress,
+		PostalCode:      req.PostalCode,
 		Latitude:        pgFloat8(req.Latitude),
 		Longitude:       pgFloat8(req.Longitude),
 		SubCategory:     req.SubCategory,
@@ -181,6 +182,7 @@ func (h *Handler) GetOne(c *gin.Context) {
 		}
 	}
 
+	// JSONB comes back as raw bytes; send it as JSON rather than base64.
 	attrs := listing.Attributes
 	if len(attrs) == 0 {
 		attrs = []byte("{}")
@@ -193,22 +195,6 @@ func (h *Handler) GetOne(c *gin.Context) {
 		"like_count":  likeCount,
 		"liked_by_me": likedByMe,
 		"attributes":  json.RawMessage(attrs),
-		"seller": gin.H{
-			"id":           seller.ID,
-			"name":         seller.Name,
-			"display_name": seller.DisplayName,
-			"avatar_url":   seller.AvatarUrl.String,
-			"created_at":   seller.CreatedAt.Time,
-		},
-	})
-
-	c.JSON(http.StatusOK, gin.H{
-		"listing":     listing,
-		"images":      images,
-		"similar":     similarOut,
-		"like_count":  likeCount,
-		"liked_by_me": likedByMe,
-		"attributes":  json.RawMessage(listing.Attributes),
 		"seller": gin.H{
 			"id":           seller.ID,
 			"name":         seller.Name,
@@ -255,12 +241,12 @@ func (h *Handler) Update(c *gin.Context) {
 		County:          req.County,
 		Municipality:    req.Municipality,
 		StreetAddress:   req.StreetAddress,
+		PostalCode:      req.PostalCode,
 		Latitude:        pgFloat8(req.Latitude),
 		Longitude:       pgFloat8(req.Longitude),
 		SubCategory:     req.SubCategory,
 		ProductCategory: req.ProductCategory,
 		Attributes:      attrsJSON(req.Attributes),
-		PostalCode:      req.PostalCode,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -348,6 +334,7 @@ func (h *Handler) Search(c *gin.Context) {
 		argN++
 	}
 
+	// Attribute keys are parameterised, so a crafted key can't inject SQL.
 	for key, val := range req.Attributes {
 		if val == "" {
 			continue
@@ -365,6 +352,7 @@ func (h *Handler) Search(c *gin.Context) {
 		args = append(args, req.Place)
 		argN++
 	}
+
 	if req.Condition != "" {
 		sql += " AND condition = $" + strconv.Itoa(argN)
 		args = append(args, req.Condition)
