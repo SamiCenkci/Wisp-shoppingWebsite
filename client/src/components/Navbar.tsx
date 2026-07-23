@@ -118,8 +118,11 @@ export default function Navbar() {
         <button
           onClick={() => {
             setMenuOpen(false);
-            router.push("/");
-            router.refresh();
+            if (pathname === "/") {
+              window.location.href = "/";
+            } else {
+              router.push("/");
+            }
           }}
           className="text-2xl font-bold text-brand shrink-0 tracking-tight hover:text-brand-dark"
         >

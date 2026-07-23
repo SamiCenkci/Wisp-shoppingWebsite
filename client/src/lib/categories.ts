@@ -30,6 +30,7 @@ export type MainCategory = {
   subs: SubCategory[];
 };
 
+
 // --- Shared attribute definitions ----------------------------------------
 
 const COLOR: AttributeField = {
