@@ -56,6 +56,7 @@ func Load() *Config {
 		S3Bucket:           os.Getenv("S3_BUCKET"),
 		AllowedOrigins:     originList,
 		ResendAPIKey:       os.Getenv("RESEND_API_KEY"),
+		AlertSecret:        os.Getenv("ALERT_SECRET"),
 	}
 	if cfg.DatabaseURL == "" {
 		log.Fatal("DATABASE_URL is not set in .env")
