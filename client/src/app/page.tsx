@@ -26,40 +26,29 @@ type Listing = {
   images?: Image[];
 };
 
+const emptyFilters = {
+  query: "",
+  category: "",
+  sub_category: "",
+  product_category: "",
+  place: "",
+  condition: "",
+  ad_type: "",
+  min_price: "",
+  max_price: "",
+  sort_by: "newest",
+};
+
 function HomeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const [filters, setFilters] = useState({
-    query: "",
-    category: "",
-    sub_category: "",
-    product_category: "",
-    place: "",
-    condition: "",
-    ad_type: "",
-    min_price: "",
-    max_price: "",
-    sort_by: "newest",
-  });
+  const [filters, setFilters] = useState(emptyFilters);
   const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
   const [isSearchResult, setIsSearchResult] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-
-  const emptyFilters = {
-    query: "",
-    category: "",
-    sub_category: "",
-    product_category: "",
-    place: "",
-    condition: "",
-    ad_type: "",
-    min_price: "",
-    max_price: "",
-    sort_by: "newest",
-  };
 
   function seedLiked(data: Listing[]) {
     const ids = new Set<string>();
@@ -69,6 +58,18 @@ function HomeInner() {
     setLikedIds(ids);
   }
 
+  // The category drill-down lives in the URL, so the browser back button
+  // steps out one level at a time instead of leaving the page.
+  function navigate(next: { category?: string; sub?: string; product?: string; query?: string }) {
+    const params = new URLSearchParams();
+    if (next.query) params.set("q", next.query);
+    if (next.category) params.set("category", next.category);
+    if (next.sub) params.set("sub", next.sub);
+    if (next.product) params.set("product", next.product);
+    const qs = params.toString();
+    router.push(qs ? `/?${qs}` : "/");
+  }
+
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("recentSearches") || "[]");
@@ -76,13 +77,25 @@ function HomeInner() {
     } catch {}
 
     const q = searchParams.get("q") ?? "";
-    if (q) {
-      setFilters((prev) => ({ ...prev, query: q }));
-      runSearch({ query: q });
+    const category = searchParams.get("category") ?? "";
+    const sub = searchParams.get("sub") ?? "";
+    const product = searchParams.get("product") ?? "";
+
+    setAttrFilters({});
+
+    if (q || category) {
+      setFilters((prev) => ({
+        ...prev,
+        query: q,
+        category,
+        sub_category: sub,
+        product_category: product,
+      }));
+      runSearch({ query: q, category, sub_category: sub, product_category: product }, {});
     } else {
       setIsSearchResult(false);
       setFilters(emptyFilters);
-      setAttrFilters({});
+      setLoading(true);
       api("/api/listings")
         .then((data) => {
           setListings(data ?? []);
@@ -106,11 +119,6 @@ function HomeInner() {
       localStorage.setItem("recentSearches", JSON.stringify(next));
       return next;
     });
-  }
-
-  function clearRecent() {
-    setRecentSearches([]);
-    localStorage.removeItem("recentSearches");
   }
 
   async function runSearch(override?: Partial<typeof filters>, attrs?: Record<string, string>) {
@@ -145,43 +153,27 @@ function HomeInner() {
     }
   }
 
-  async function resetAll() {
-    setFilters(emptyFilters);
-    setAttrFilters({});
-    setLoading(true);
-    try {
-      const data = await api("/api/listings");
-      setListings(data ?? []);
-      seedLiked(data ?? []);
-      setIsSearchResult(false);
-    } finally {
-      setLoading(false);
-    }
+  function resetAll() {
+    navigate({});
   }
 
   function pickCategory(cat: string) {
-    const next = filters.category === cat ? "" : cat;
-    setFilters((prev) => ({ ...prev, category: next, sub_category: "", product_category: "" }));
-    setAttrFilters({});
-    if (!next) {
-      resetAll();
-      return;
-    }
-    runSearch({ category: next, sub_category: "", product_category: "" }, {});
+    navigate({ category: filters.category === cat ? "" : cat });
   }
 
   function pickSub(sub: string) {
-    const next = filters.sub_category === sub ? "" : sub;
-    setFilters((prev) => ({ ...prev, sub_category: next, product_category: "" }));
-    setAttrFilters({});
-    runSearch({ sub_category: next, product_category: "" }, {});
+    navigate({
+      category: filters.category,
+      sub: filters.sub_category === sub ? "" : sub,
+    });
   }
 
   function pickProduct(prod: string) {
-    const next = filters.product_category === prod ? "" : prod;
-    setFilters((prev) => ({ ...prev, product_category: next }));
-    setAttrFilters({});
-    runSearch({ product_category: next }, {});
+    navigate({
+      category: filters.category,
+      sub: filters.sub_category,
+      product: filters.product_category === prod ? "" : prod,
+    });
   }
 
   function pickAttr(key: string, value: string) {
@@ -243,13 +235,16 @@ function HomeInner() {
             ) : (
               <div>
                 <div className="flex items-center flex-wrap gap-1.5 text-sm mb-3">
-                  <button onClick={() => pickCategory("")} className="text-brand hover:text-brand-dark">
+                  <button onClick={() => navigate({})} className="text-brand hover:text-brand-dark">
                     Alle kategorier
                   </button>
                   <span className="text-ink-muted">/</span>
                   {filters.sub_category ? (
                     <>
-                      <button onClick={() => pickSub(filters.sub_category)} className="text-brand hover:text-brand-dark">
+                      <button
+                        onClick={() => navigate({ category: filters.category })}
+                        className="text-brand hover:text-brand-dark"
+                      >
                         {filters.category}
                       </button>
                       <span className="text-ink-muted">/</span>
@@ -299,7 +294,7 @@ function HomeInner() {
                     <label className="block text-sm font-medium text-ink mb-1">Underkategori</label>
                     <select
                       value={filters.sub_category}
-                      onChange={(e) => pickSub(e.target.value)}
+                      onChange={(e) => navigate({ category: filters.category, sub: e.target.value })}
                       className={inputClass}
                     >
                       <option value="">Alle</option>
@@ -315,7 +310,13 @@ function HomeInner() {
                     <label className="block text-sm font-medium text-ink mb-1">Produktkategori</label>
                     <select
                       value={filters.product_category}
-                      onChange={(e) => pickProduct(e.target.value)}
+                      onChange={(e) =>
+                        navigate({
+                          category: filters.category,
+                          sub: filters.sub_category,
+                          product: e.target.value,
+                        })
+                      }
                       className={inputClass}
                     >
                       <option value="">Alle</option>
