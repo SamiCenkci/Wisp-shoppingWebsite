@@ -73,7 +73,8 @@ export default function ListingDetailPage() {
   const [soldModal, setSoldModal] = useState(false);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [loadingBuyers, setLoadingBuyers] = useState(false);
-
+  const [attributes, setAttributes] = useState<Record<string, string>>({});
+  
   function loadListing() {
     return api(`/api/listings/${params.id}`).then((data) => {
       setListing(data.listing);
@@ -154,6 +155,7 @@ export default function ListingDetailPage() {
       });
       const data = await api(`/api/listings/${listing.id}`);
       setLikeCount(data.like_count ?? 0);
+      setAttributes(data.attributes && typeof data.attributes === "object" ? data.attributes : {});
       setLiked(data.liked_by_me ?? false);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Kunne ikke oppdatere");
@@ -273,12 +275,12 @@ export default function ListingDetailPage() {
             </span>
           </div>
 
-          {listing.attributes && Object.keys(listing.attributes).length > 0 && (
+          {Object.keys(attributes).length > 0 && (
             <dl className="mt-5 border border-line rounded-xl divide-y divide-line text-sm">
-              {Object.entries(listing.attributes).map(([key, value]) =>
+              {Object.entries(attributes).map(([key, value]) =>
                 value ? (
                   <div key={key} className="flex justify-between px-4 py-2.5">
-                    <dt className="text-ink-secondary capitalize">{attrLabels[key] ?? key}</dt>
+                    <dt className="text-ink-secondary">{ATTRIBUTE_LABELS[key] ?? key}</dt>
                     <dd className="text-ink font-medium">{value}</dd>
                   </div>
                 ) : null
