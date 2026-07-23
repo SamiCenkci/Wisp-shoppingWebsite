@@ -119,31 +119,25 @@ func (h *Handler) CreateReview(c *gin.Context) {
 		return
 	}
 
-	if listing.Status != "sold" || !listing.SoldTo.Valid {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "kan kun vurdere etter fullført salg"})
-		return
-	}
-
-	sellerID := uuid.UUID(listing.UserID.Bytes)
-	buyerID := uuid.UUID(listing.SoldTo.Bytes)
-
-	var reviewedID uuid.UUID
-	switch reviewerID {
-	case sellerID:
-		reviewedID = buyerID
-	case buyerID:
-		reviewedID = sellerID
-	default:
-		c.JSON(http.StatusForbidden, gin.H{"error": "du var ikke del av dette salget"})
-		return
-	}
-
 	already, _ := h.Queries.HasReviewed(context.Background(), db.HasReviewedParams{
 		ListingID:  pgUUID(listingID),
 		ReviewerID: pgUUID(reviewerID),
 	})
-	if already {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "du har allerede vurdert dette salget"})
+
+	reviewedID, err := reviewTarget(
+		listing.Status,
+		listing.SoldTo.Valid,
+		uuid.UUID(listing.UserID.Bytes),
+		uuid.UUID(listing.SoldTo.Bytes),
+		reviewerID,
+		already,
+	)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err == ErrNotPartOfSale {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 

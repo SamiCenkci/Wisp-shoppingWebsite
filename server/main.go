@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/SamiCenkci/Shopping-Website/auth"
 	"github.com/SamiCenkci/Shopping-Website/chat"
 	"github.com/SamiCenkci/Shopping-Website/config"
@@ -45,7 +47,15 @@ func main() {
 	chatHub := chat.NewHub()
 	chatHandler := &chat.Handler{Queries: queries, Hub: chatHub}
 
+	// Rate limiters: protect against brute-force logins and spam.
+	loginLimiter := auth.NewLimiter(8, time.Minute)
+	signupLimiter := auth.NewLimiter(5, time.Hour)
+	listingLimiter := auth.NewLimiter(20, time.Hour)
+
 	router := gin.Default()
+
+	// Render terminates TLS at its proxy, so trust the forwarded client IP.
+	_ = router.SetTrustedProxies([]string{"0.0.0.0/0"})
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowedOrigins,
@@ -59,8 +69,8 @@ func main() {
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
-		api.POST("/auth/signup", authHandler.Register)
-		api.POST("/auth/login", authHandler.Login)
+		api.POST("/auth/signup", signupLimiter.Middleware(), authHandler.Register)
+		api.POST("/auth/login", loginLimiter.Middleware(), authHandler.Login)
 
 		api.GET("/me", auth.RequireAuth(cfg.JWTSecret), func(c *gin.Context) {
 			c.JSON(200, gin.H{"user_id": c.GetString("userID")})
@@ -70,7 +80,7 @@ func main() {
 		api.GET("/listings/mine", auth.RequireAuth(cfg.JWTSecret), listingHandler.Mine)
 		api.POST("/listings/search", auth.OptionalAuth(cfg.JWTSecret), listingHandler.Search)
 		api.GET("/listings/:id", auth.OptionalAuth(cfg.JWTSecret), listingHandler.GetOne)
-		api.POST("/listings", auth.RequireAuth(cfg.JWTSecret), listingHandler.Create)
+		api.POST("/listings", listingLimiter.Middleware(), auth.RequireAuth(cfg.JWTSecret), listingHandler.Create)
 		api.PUT("/listings/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.Update)
 		api.DELETE("/listings/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.Delete)
 		api.PUT("/listings/:id/status", auth.RequireAuth(cfg.JWTSecret), listingHandler.SetStatus)
