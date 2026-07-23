@@ -99,3 +99,42 @@ func (s *Sender) SendReviewRequest(toEmail, buyerName, listingTitle, sellerName,
 
 	go s.send(toEmail, "Hvordan gikk handelen på Wisp?", html)
 }
+
+// SendPriceDropAlert tells someone a listing they favorited got cheaper.
+func (s *Sender) SendPriceDropAlert(toEmail, name, listingTitle, listingID string, oldPriceOre, newPriceOre int32) {
+	listingURL := fmt.Sprintf("%s/listings/%s", s.SiteURL, listingID)
+	oldKr := oldPriceOre / 100
+	newKr := newPriceOre / 100
+	savedKr := oldKr - newKr
+
+	html := fmt.Sprintf(`
+<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1a1a1a">
+  <div style="font-size:26px;font-weight:700;color:#1A9E4B;margin-bottom:24px">Wisp</div>
+
+  <h1 style="font-size:22px;margin:0 0 12px">Prisen har gått ned, %s! 🎉</h1>
+
+  <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 24px">
+    En annonse du har lagret er blitt billigere.
+  </p>
+
+  <div style="background:#f6f8f6;border-radius:12px;padding:20px;margin-bottom:24px">
+    <p style="font-size:17px;font-weight:600;margin:0 0 12px">%s</p>
+    <p style="margin:0;font-size:15px;color:#555">
+      <span style="text-decoration:line-through;color:#999">%d kr</span>
+      &nbsp;&rarr;&nbsp;
+      <span style="font-size:22px;font-weight:700;color:#1A9E4B">%d kr</span>
+    </p>
+    <p style="margin:8px 0 0;font-size:14px;color:#1A9E4B;font-weight:600">Du sparer %d kr</p>
+  </div>
+
+  <a href="%s" style="display:inline-block;background:#1A9E4B;color:#fff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:600;font-size:15px">
+    Se annonsen
+  </a>
+
+  <p style="font-size:13px;color:#999;margin-top:32px;border-top:1px solid #eee;padding-top:16px">
+    Du får denne e-posten fordi du har lagret annonsen som favoritt på Wisp.
+  </p>
+</div>`, name, listingTitle, oldKr, newKr, savedKr, listingURL)
+
+	go s.send(toEmail, "Prisen har gått ned på en annonse du følger", html)
+}

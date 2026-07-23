@@ -132,6 +132,45 @@ func (q *Queries) ListFavoriteListingsByUser(ctx context.Context, userID pgtype.
 	return items, nil
 }
 
+const listFavoritersForListing = `-- name: ListFavoritersForListing :many
+SELECT u.id, u.email, u.name, u.display_name
+FROM favorites f
+JOIN users u ON u.id = f.user_id
+WHERE f.listing_id = $1
+`
+
+type ListFavoritersForListingRow struct {
+	ID          pgtype.UUID `json:"id"`
+	Email       string      `json:"email"`
+	Name        string      `json:"name"`
+	DisplayName string      `json:"display_name"`
+}
+
+func (q *Queries) ListFavoritersForListing(ctx context.Context, listingID pgtype.UUID) ([]ListFavoritersForListingRow, error) {
+	rows, err := q.db.Query(ctx, listFavoritersForListing, listingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListFavoritersForListingRow
+	for rows.Next() {
+		var i ListFavoritersForListingRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Name,
+			&i.DisplayName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeFavorite = `-- name: RemoveFavorite :exec
 DELETE FROM favorites WHERE user_id = $1 AND listing_id = $2
 `

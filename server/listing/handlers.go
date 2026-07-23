@@ -3,6 +3,7 @@ package listing
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -22,19 +23,19 @@ type Handler struct {
 }
 
 type createRequest struct {
-	Title           string            `json:"title" binding:"required"`
-	Description     string            `json:"description" binding:"required"`
+	Title           string            `json:"title" binding:"required,max=100"`
+	Description     string            `json:"description" binding:"required,max=5000"`
+	StreetAddress   string            `json:"street_address" binding:"max=200"`
+	PostalCode      string            `json:"postal_code" binding:"max=10"`
+	Municipality    string            `json:"municipality" binding:"required,max=100"`
+	County          string            `json:"county" binding:"required,max=100"`
 	PriceOre        int32             `json:"price_ore" binding:"required,min=0"`
 	Category        string            `json:"category" binding:"required"`
 	Subcategory     string            `json:"subcategory"`
 	Condition       string            `json:"condition" binding:"required"`
-	County          string            `json:"county" binding:"required"`
-	Municipality    string            `json:"municipality" binding:"required"`
 	AdType          string            `json:"ad_type"`
-	StreetAddress   string            `json:"street_address"`
 	Latitude        float64           `json:"latitude"`
 	Longitude       float64           `json:"longitude"`
-	PostalCode      string            `json:"postal_code"`
 	SubCategory     string            `json:"sub_category"`
 	ProductCategory string            `json:"product_category"`
 	Attributes      map[string]string `json:"attributes"`
@@ -252,6 +253,26 @@ func (h *Handler) Update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// If the price dropped, tell everyone who favorited this listing.
+	// Runs in the background so the seller's save isn't held up by email.
+	if h.Email != nil && req.PriceOre < existing.PriceOre && req.PriceOre > 0 {
+		go func(listingID uuid.UUID, title string, oldPrice, newPrice int32) {
+			favoriters, err := h.Queries.ListFavoritersForListing(context.Background(), pgUUID(listingID))
+			if err != nil {
+				log.Printf("price drop: could not load favoriters: %v", err)
+				return
+			}
+			for _, u := range favoriters {
+				name := u.Name
+				if u.DisplayName != "" {
+					name = u.DisplayName
+				}
+				h.Email.SendPriceDropAlert(u.Email, name, title, listingID.String(), oldPrice, newPrice)
+			}
+		}(id, req.Title, existing.PriceOre, req.PriceOre)
+	}
+
 	c.JSON(http.StatusOK, updated)
 }
 
@@ -381,7 +402,9 @@ func (h *Handler) Search(c *gin.Context) {
 		sql += " ORDER BY price_ore DESC"
 	default:
 		if req.Query != "" {
-			sql += " ORDER BY similarity(title, '" + sanitize(req.Query) + "') DESC, created_at DESC"
+			sql += " ORDER BY similarity(title, $" + strconv.Itoa(argN) + ") DESC, created_at DESC"
+			args = append(args, req.Query)
+			argN++
 		} else {
 			sql += " ORDER BY created_at DESC"
 		}
@@ -492,17 +515,6 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "status oppdatert"})
-}
-
-// sanitize strips single quotes to keep an inline string safe in SQL.
-func sanitize(s string) string {
-	out := make([]rune, 0, len(s))
-	for _, r := range s {
-		if r != '\'' {
-			out = append(out, r)
-		}
-	}
-	return string(out)
 }
 
 // pgFloat8 wraps a float64, treating 0 as "not set".

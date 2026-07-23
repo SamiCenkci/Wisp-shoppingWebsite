@@ -197,9 +197,9 @@ func (h *Handler) Messages(c *gin.Context) {
 }
 
 type sendRequest struct {
-	Content        string `json:"content"`
-	AttachmentURL  string `json:"attachment_url"`
-	AttachmentName string `json:"attachment_name"`
+	Content        string `json:"content" binding:"max=5000"`
+	AttachmentURL  string `json:"attachment_url" binding:"max=500"`
+	AttachmentName string `json:"attachment_name" binding:"max=255"`
 }
 
 func (h *Handler) Send(c *gin.Context) {
