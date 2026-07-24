@@ -33,7 +33,6 @@ type createRequest struct {
 	County          string            `json:"county" binding:"required,max=100"`
 	PriceOre        int32             `json:"price_ore" binding:"required,min=0"`
 	Category        string            `json:"category" binding:"required"`
-	Subcategory     string            `json:"subcategory"`
 	Condition       string            `json:"condition" binding:"required"`
 	AdType          string            `json:"ad_type"`
 	Latitude        float64           `json:"latitude"`
@@ -69,7 +68,6 @@ func (h *Handler) Create(c *gin.Context) {
 		Description:     req.Description,
 		PriceOre:        req.PriceOre,
 		Category:        req.Category,
-		Subcategory:     pgText(req.Subcategory),
 		Condition:       req.Condition,
 		County:          req.County,
 		Municipality:    req.Municipality,
@@ -239,7 +237,6 @@ func (h *Handler) Update(c *gin.Context) {
 		Description:     req.Description,
 		PriceOre:        req.PriceOre,
 		Category:        req.Category,
-		Subcategory:     pgText(req.Subcategory),
 		Condition:       req.Condition,
 		County:          req.County,
 		Municipality:    req.Municipality,
