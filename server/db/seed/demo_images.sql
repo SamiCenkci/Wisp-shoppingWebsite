@@ -21,7 +21,7 @@ SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/lis
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'MacBook Air M2 13" 256GB' AND deleted_at IS NULL);
  
 UPDATE listing_images
-SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/ps5.avif'
+SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/ps5.webp'
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'PlayStation 5 med to kontroller' AND deleted_at IS NULL);
  
 UPDATE listing_images
@@ -33,7 +33,7 @@ SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/lis
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'iPhone 13 128GB, blå' AND deleted_at IS NULL);
  
 UPDATE listing_images
-SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/sofa.webp'
+SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/sofa.jpg'
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'IKEA Ektorp 3-seter sofa' AND deleted_at IS NULL);
  
 UPDATE listing_images
@@ -41,7 +41,7 @@ SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/lis
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'Spisebord i eik, 180 cm' AND deleted_at IS NULL);
  
 UPDATE listing_images
-SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/desk.avif'
+SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/desk.jpeg'
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'Skrivebord med hev/senk' AND deleted_at IS NULL);
  
 UPDATE listing_images
@@ -57,7 +57,7 @@ SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/lis
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'Alpinski Atomic 170 cm med binding' AND deleted_at IS NULL);
  
 UPDATE listing_images
-SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/guitar.avif'
+SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/guitar.webp'
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'Fender Stratocaster, mexicansk' AND deleted_at IS NULL);
  
 UPDATE listing_images
@@ -77,7 +77,7 @@ SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/lis
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'Flyttekasser - gis bort' AND deleted_at IS NULL);
  
 UPDATE listing_images
-SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/coffee-table.jpg'
+SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/listings/coffee-table.webp'
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'Sofabord i glass - gis bort' AND deleted_at IS NULL);
  
 -- Sanity check: any listing still pointing at a placeholder didn't get updated.
