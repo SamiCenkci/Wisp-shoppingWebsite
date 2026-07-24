@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import StarRating from "@/components/StarRating";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type Review = {
   id: string;
@@ -57,8 +58,13 @@ export default function MyReviewsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
   async function submitReply(reviewId: string) {
     if (!replyText.trim()) return;
+    setError("");
     try {
       await api(`/api/reviews/${reviewId}/reply`, {
         method: "POST",
@@ -68,17 +74,20 @@ export default function MyReviewsPage() {
       setReplyText("");
       loadAll();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke lagre svar");
+      setError(err instanceof Error ? err.message : "Kunne ikke lagre svar");
     }
   }
 
-  async function deleteReview(reviewId: string) {
-    if (!confirm("Slette denne vurderingen?")) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
+    setError("");
     try {
-      await api(`/api/reviews/${reviewId}`, { method: "DELETE" });
+      await api(`/api/reviews/${id}`, { method: "DELETE" });
       loadAll();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke slette");
+      setError(err instanceof Error ? err.message : "Kunne ikke slette");
     }
   }
 
@@ -224,11 +233,14 @@ export default function MyReviewsPage() {
                 {tab === "given" && (
                   <div className="mt-4 pt-4 border-t border-line">
                     <button
-                      onClick={() => deleteReview(r.id)}
+                      onClick={() => setDeleteTarget(r.id)}
                       className="text-sm text-red-600 hover:text-red-700 font-medium"
                     >
                       Slett vurdering
                     </button>
+                    {error && (
+                      <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -236,6 +248,15 @@ export default function MyReviewsPage() {
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Slette vurderingen?"
+        message="Vurderingen blir borte for godt."
+        confirmLabel="Slett"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </main>
   );
 }

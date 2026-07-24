@@ -45,6 +45,7 @@ export default function MyListingsPage() {
   const [loadingBuyers, setLoadingBuyers] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [reviewable, setReviewable] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState("");
 
   function load() {
     api("/api/listings/mine")
@@ -84,9 +85,9 @@ export default function MyListingsPage() {
     try {
       await api(`/api/listings/${id}`, { method: "DELETE" });
       setListings((prev) => prev.filter((l) => l.id !== id));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Sletting feilet");
-    }
+    } catch (err) {error && (
+          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
   }
 
   async function setStatus(id: string, status: string) {
@@ -96,9 +97,9 @@ export default function MyListingsPage() {
         body: JSON.stringify({ status }),
       });
       setListings((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke oppdatere");
-    }
+    } catch (err) {error && (
+          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
   }
 
   async function openSoldModal(listingId: string, title: string) {

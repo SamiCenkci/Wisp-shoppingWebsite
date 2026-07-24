@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import ConfirmDialog from "@/components/ConfirmDialog";
+
 
 type Report = {
   id: string;
@@ -65,7 +67,11 @@ export default function AdminReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function setStatus(id: string, status: string) {
+    const [removeTarget, setRemoveTarget] = useState<{ listingId: string; reportId: string; title: string } | null>(null);
+    const [error, setError] = useState("");
+
+ async function setStatus(id: string, status: string) {
+    setError("");
     try {
       await api(`/api/admin/reports/${id}`, {
         method: "PUT",
@@ -73,12 +79,15 @@ export default function AdminReportsPage() {
       });
       load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke oppdatere");
+      setError(err instanceof Error ? err.message : "Kunne ikke oppdatere");
     }
   }
 
-  async function removeListing(listingId: string, reportId: string) {
-    if (!confirm("Fjerne denne annonsen?")) return;
+  async function confirmRemove() {
+    if (!removeTarget) return;
+    const { listingId, reportId } = removeTarget;
+    setRemoveTarget(null);
+    setError("");
     try {
       await api(`/api/admin/listings/${listingId}`, { method: "DELETE" });
       await api(`/api/admin/reports/${reportId}`, {
@@ -87,7 +96,7 @@ export default function AdminReportsPage() {
       });
       load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke fjerne annonsen");
+      setError(err instanceof Error ? err.message : "Kunne ikke fjerne annonsen");
     }
   }
 
@@ -175,7 +184,7 @@ export default function AdminReportsPage() {
                       </button>
                       {!removed && (
                         <button
-                          onClick={() => removeListing(r.listing_id, r.id)}
+                          onClick={() => setRemoveTarget({ listingId: r.listing_id, reportId: r.id, title: r.listing_title })}
                           className="px-3.5 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700"
                         >
                           Fjern annonsen
@@ -197,6 +206,15 @@ export default function AdminReportsPage() {
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        title="Fjerne annonsen?"
+        message={removeTarget ? `«${removeTarget.title}» blir skjult fra markedsplassen.` : undefined}
+        confirmLabel="Fjern"
+        danger
+        onConfirm={confirmRemove}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </main>
   );
 }
