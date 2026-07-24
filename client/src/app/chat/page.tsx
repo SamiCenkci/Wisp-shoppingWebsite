@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
+import { compressImage } from "@/lib/compressImage";
 
 type Conversation = {
   id: string;
@@ -141,7 +142,8 @@ function ChatInner() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function onFilePick(file: File) {
+  async function onFilePick(original: File) {
+    const file = await compressImage(original);
     if (file.size > 10 * 1024 * 1024) {
       alert("Filen er for stor. Maks 10 MB.");
       if (fileRef.current) fileRef.current.value = "";
@@ -172,7 +174,7 @@ function ChatInner() {
       if (fileRef.current) fileRef.current.value = "";
     }
   }
-  
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if ((!text.trim() && !attachment) || !activeId) return;

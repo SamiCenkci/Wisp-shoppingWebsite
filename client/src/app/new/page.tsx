@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { TAXONOMY, getSubs, getProducts, getAttributes } from "@/lib/categories";
 import AddressAutocomplete, { SelectedAddress } from "@/components/AddressAutocomplete";
+import { compressImage } from "@/lib/compressImage";
 
 export default function NewListingPage() {
   const router = useRouter();
@@ -68,9 +69,11 @@ export default function NewListingPage() {
     setPreviews(selected.map((f) => URL.createObjectURL(f)));
   }
 
-  async function uploadFile(file: File): Promise<string> {
+  async function uploadFile(original: File): Promise<string> {
+    const file = await compressImage(original);
+
     if (file.size > MAX_UPLOAD_BYTES) {
-      throw new Error(`${file.name} er for stor. Maks 10 MB per bilde.`);
+      throw new Error(`${original.name} er for stor. Maks 10 MB per bilde.`);
     }
     const { upload_url, public_url } = await api("/api/uploads/presign", {
       method: "POST",

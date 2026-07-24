@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { compressImage } from "@/lib/compressImage";
 
 const currentYear = new Date().getFullYear();
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -74,18 +75,23 @@ export default function EditProfilePage() {
     (Number(form.birth_year) < 1900 || Number(form.birth_year) > currentYear);
   const phoneInvalid = phoneDigits.length > 0 && phoneDigits.length < 8;
 
-  async function uploadAvatar(file: File) {
+  async function uploadAvatar(original: File) {
     setError("");
+    if (!original.type) {
+      setError("Kunne ikke gjenkjenne filtypen. Prøv en JPG, PNG, GIF eller WEBP.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+
+    // Avatars render at 112px, so anything larger than 512 is wasted bytes.
+    const file = await compressImage(original, 512);
+
     if (file.size > MAX_UPLOAD_BYTES) {
       setError("Bildet er for stort. Maks 10 MB.");
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
-    if (!file.type) {
-      setError("Kunne ikke gjenkjenne filtypen. Prøv en JPG, PNG, GIF eller WEBP.");
-      if (fileRef.current) fileRef.current.value = "";
-      return;
-    }
+
     setUploading(true);
     try {
       const { upload_url, public_url } = await api("/api/uploads/presign", {
