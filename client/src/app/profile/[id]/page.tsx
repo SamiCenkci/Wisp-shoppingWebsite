@@ -1,551 +1,303 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import {
-  CATEGORIES,
-  CATEGORY_ICONS,
-  HIDDEN_FROM_NAV,
-  getSubs,
-  getProducts,
-  getAttributes,
-} from "@/lib/categories";
+import StarRating from "@/components/StarRating";
 
 type Image = { id: string; url: string };
 type Listing = {
   id: string;
   title: string;
-  description: string;
   price_ore: number;
   category: string;
-  county: string;
   municipality: string;
-  ad_type?: string;
-  liked_by_me?: boolean;
+  county: string;
   images?: Image[];
 };
-
-const emptyFilters = {
-  query: "",
-  category: "",
-  sub_category: "",
-  product_category: "",
-  place: "",
-  condition: "",
-  ad_type: "",
-  min_price: "",
-  max_price: "",
-  sort_by: "newest",
+type Profile = {
+  id: string;
+  name: string;
+  display_name: string;
+  avatar_url: string;
+  bio: string;
+  phone: string;
+  city: string;
+  created_at: string;
+};
+type Review = {
+  id: string;
+  reviewer_name: string;
+  reviewer_display_name: string;
+  listing_title: string;
+  communication: number;
+  reliability: number;
+  as_described: number;
+  comment: string;
+  created_at: string;
 };
 
-function HomeInner() {
+export default function ProfilePage() {
+  const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const [filters, setFilters] = useState(emptyFilters);
-  const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
-  const [isSearchResult, setIsSearchResult] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [savingSearch, setSavingSearch] = useState(false);
-  const [savedMsg, setSavedMsg] = useState("");
-
-  function seedLiked(data: Listing[]) {
-    const ids = new Set<string>();
-    (data ?? []).forEach((l) => {
-      if (l.liked_by_me) ids.add(l.id);
-    });
-    setLikedIds(ids);
-  }
-
-  // The category drill-down lives in the URL, so the browser back button
-  // steps out one level at a time instead of leaving the page.
-  function navigate(next: { category?: string; sub?: string; product?: string; query?: string }) {
-    const params = new URLSearchParams();
-    if (next.query) params.set("q", next.query);
-    if (next.category) params.set("category", next.category);
-    if (next.sub) params.set("sub", next.sub);
-    if (next.product) params.set("product", next.product);
-    const qs = params.toString();
-    router.push(qs ? `/?${qs}` : "/");
-  }
+  const [isOwn, setIsOwn] = useState(false);
+  const [favorites, setFavorites] = useState<Listing[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("recentSearches") || "[]");
-      if (Array.isArray(saved)) setRecentSearches(saved);
-    } catch {}
+    api(`/api/users/${params.id}`)
+      .then((data) => {
+        setProfile(data.user);
+        setListings(data.listings ?? []);
+        const token = localStorage.getItem("token");
+        const stored = localStorage.getItem("user");
+        if (token && stored) {
+          try {
+            const me = JSON.parse(stored);
+            setIsOwn(me.id === data.user.id);
+          } catch {}
+        } else {
+          setIsOwn(false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [params.id]);
 
-    const q = searchParams.get("q") ?? "";
-    const category = searchParams.get("category") ?? "";
-    const sub = searchParams.get("sub") ?? "";
-    const product = searchParams.get("product") ?? "";
+  useEffect(() => {
+    api(`/api/users/${params.id}/reviews`)
+      .then((data) => {
+        setReviews(data.reviews ?? []);
+        setReviewCount(Number(data.review_count ?? 0));
+        setAvgRating(Number(data.average_rating ?? 0));
+      })
+      .catch(() => {});
+  }, [params.id]);
 
-    setAttrFilters({});
-    setSavedMsg("");
-
-    if (q || category) {
-      setFilters((prev) => ({
-        ...prev,
-        query: q,
-        category,
-        sub_category: sub,
-        product_category: product,
-      }));
-      runSearch({ query: q, category, sub_category: sub, product_category: product }, {});
-    } else {
-      setIsSearchResult(false);
-      setFilters(emptyFilters);
-      setLoading(true);
-      api("/api/listings")
-        .then((data) => {
-          setListings(data ?? []);
-          seedLiked(data ?? []);
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  function update(field: string, value: string) {
-    setFilters((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function saveSearch(term: string) {
-    const t = term.trim();
-    if (!t) return;
-    setRecentSearches((prev) => {
-      const next = [t, ...prev.filter((s) => s.toLowerCase() !== t.toLowerCase())].slice(0, 5);
-      localStorage.setItem("recentSearches", JSON.stringify(next));
-      return next;
-    });
-  }
-
-  async function runSearch(override?: Partial<typeof filters>, attrs?: Record<string, string>) {
-    setLoading(true);
-    const f = { ...filters, ...override };
-    try {
-      const body = {
-        query: f.query,
-        category: f.category,
-        sub_category: f.sub_category,
-        product_category: f.product_category,
-        attributes: attrs ?? attrFilters,
-        place: f.place,
-        condition: f.condition,
-        ad_type: f.ad_type,
-        min_price: f.min_price ? Math.round(parseFloat(f.min_price) * 100) : 0,
-        max_price: f.max_price ? Math.round(parseFloat(f.max_price) * 100) : 0,
-        sort_by: f.sort_by,
-      };
-      const data = await api("/api/listings/search", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-      setListings(data ?? []);
-      seedLiked(data ?? []);
-      setIsSearchResult(true);
-      if (f.query) saveSearch(f.query);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function resetAll() {
-    navigate({});
-  }
-
-  function pickCategory(cat: string) {
-    navigate({ category: filters.category === cat ? "" : cat });
-  }
-
-  function pickSub(sub: string) {
-    navigate({
-      category: filters.category,
-      sub: filters.sub_category === sub ? "" : sub,
-    });
-  }
-
-  function pickProduct(prod: string) {
-    navigate({
-      category: filters.category,
-      sub: filters.sub_category,
-      product: filters.product_category === prod ? "" : prod,
-    });
-  }
-
-  function pickAttr(key: string, value: string) {
-    const next = { ...attrFilters, [key]: value };
-    setAttrFilters(next);
-    runSearch(undefined, next);
-  }
-
-  async function saveCurrentSearch() {
-    if (!localStorage.getItem("token")) {
-      router.push("/login");
+  useEffect(() => {
+    if (!isOwn) {
+      setFavorites([]);
       return;
     }
-    const suggested =
-      filters.query ||
-      filters.product_category ||
-      filters.sub_category ||
-      filters.category ||
-      "Mitt søk";
-    const name = window.prompt("Gi søket et navn:", suggested);
-    if (!name) return;
+    api(`/api/users/${params.id}/favorites`)
+      .then((data) => setFavorites(data ?? []))
+      .catch(() => setFavorites([]));
+  }, [isOwn, params.id]);
 
-    setSavingSearch(true);
-    setSavedMsg("");
-    try {
-      await api("/api/saved-searches", {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          query: filters.query,
-          category: filters.category,
-          sub_category: filters.sub_category,
-          product_category: filters.product_category,
-          attributes: attrFilters,
-          place: filters.place,
-          condition: filters.condition,
-          ad_type: filters.ad_type,
-          min_price: filters.min_price ? Math.round(parseFloat(filters.min_price) * 100) : 0,
-          max_price: filters.max_price ? Math.round(parseFloat(filters.max_price) * 100) : 0,
-        }),
-      });
-      setSavedMsg("Søket er lagret ✓");
-    } catch (err) {
-      setSavedMsg(err instanceof Error ? err.message : "Kunne ikke lagre søket");
-    } finally {
-      setSavingSearch(false);
-    }
-  }
+  if (loading) return <p className="max-w-[1400px] mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
+  if (!profile) return <p className="max-w-[1400px] mx-auto px-[5%] py-10">Bruker ikke funnet.</p>;
 
-  async function toggleLike(e: React.MouseEvent, id: string) {
-    e.stopPropagation();
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    const isLiked = likedIds.has(id);
-    setLikedIds((prev) => {
-      const next = new Set(prev);
-      if (isLiked) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    try {
-      await api(`/api/listings/${id}/favorite`, { method: isLiked ? "DELETE" : "POST" });
-    } catch {
-      setLikedIds((prev) => {
-        const next = new Set(prev);
-        if (isLiked) next.add(id);
-        else next.delete(id);
-        return next;
-      });
-    }
-  }
-
-  const inputClass = "w-full border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-brand";
-
-  const filterSubs = getSubs(filters.category);
-  const filterProducts = getProducts(filters.category, filters.sub_category);
-  const filterAttrs = getAttributes(filters.category, filters.sub_category, filters.product_category);
+  const memberSince = new Date(profile.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "long" });
+  const displayName = profile.display_name || profile.name;
 
   return (
-    <main>
-      <div className="border-b border-line bg-surface">
-        <div className="max-w-[1400px] mx-auto px-[5%]">
-          <nav className="py-4">
-            {!filters.category ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
-                {CATEGORIES.filter((c) => !HIDDEN_FROM_NAV.includes(c)).map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => pickCategory(cat)}
-                    className="flex items-center gap-2 text-left text-xs leading-tight text-ink-secondary hover:text-brand transition-colors"
-                  >
-                    <span className="text-base leading-none shrink-0">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
-                    <span>{cat}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center flex-wrap gap-1.5 text-sm mb-3">
-                  <button onClick={() => navigate({})} className="text-brand hover:text-brand-dark">
-                    Alle kategorier
-                  </button>
-                  <span className="text-ink-muted">/</span>
-                  {filters.sub_category ? (
-                    <>
-                      <button
-                        onClick={() => navigate({ category: filters.category })}
-                        className="text-brand hover:text-brand-dark"
-                      >
-                        {filters.category}
-                      </button>
-                      <span className="text-ink-muted">/</span>
-                      <span className="font-medium text-ink">{filters.sub_category}</span>
-                    </>
-                  ) : (
-                    <span className="font-medium text-ink">{filters.category}</span>
-                  )}
-                </div>
+    <main className="max-w-[1400px] mx-auto px-[5%] py-8 flex flex-col lg:flex-row gap-8">
+      <aside className="lg:w-80 shrink-0">
+        <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm lg:sticky lg:top-24">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-28 h-28 rounded-full bg-brand-lightest overflow-hidden flex items-center justify-center">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-brand text-4xl font-bold">{displayName.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <h1 className="text-xl font-bold text-ink mt-4">{displayName}</h1>
+            <p className="text-sm text-ink-secondary mt-1">Medlem siden {memberSince}</p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2">
-                  {(filters.sub_category
-                    ? filterProducts.map((p) => p.name)
-                    : filterSubs.map((s) => s.name)
-                  ).map((name) => {
-                    const active = filters.sub_category
-                      ? filters.product_category === name
-                      : filters.sub_category === name;
-                    return (
-                      <button
-                        key={name}
-                        onClick={() => (filters.sub_category ? pickProduct(name) : pickSub(name))}
-                        className={`text-left text-xs leading-tight transition-colors ${
-                          active ? "text-brand font-medium" : "text-ink-secondary hover:text-brand"
-                        }`}
-                      >
-                        {name}
-                      </button>
-                    );
-                  })}
-                </div>
+            {reviewCount > 0 && (
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <StarRating value={Math.round(avgRating)} readOnly size="sm" />
+                <p className="text-sm text-ink-secondary">
+                  <span className="font-semibold text-ink">{avgRating.toFixed(1)}</span> av 5 · {reviewCount}{" "}
+                  {reviewCount === 1 ? "vurdering" : "vurderinger"}
+                </p>
               </div>
             )}
-          </nav>
-        </div>
-      </div>
 
-      <div className="max-w-[1400px] mx-auto px-[5%] py-8 flex gap-8">
-        {(isSearchResult || filters.category) && (
-          <aside className="w-64 shrink-0 hidden lg:block">
-            <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm sticky top-24">
-              <h2 className="font-semibold text-ink mb-4">Filtrer søk</h2>
-
-              <div className="space-y-4">
-                {filterSubs.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-ink mb-1">Underkategori</label>
-                    <select
-                      value={filters.sub_category}
-                      onChange={(e) => navigate({ category: filters.category, sub: e.target.value })}
-                      className={inputClass}
-                    >
-                      <option value="">Alle</option>
-                      {filterSubs.map((s) => (
-                        <option key={s.name} value={s.name}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {filterProducts.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-ink mb-1">Produktkategori</label>
-                    <select
-                      value={filters.product_category}
-                      onChange={(e) =>
-                        navigate({
-                          category: filters.category,
-                          sub: filters.sub_category,
-                          product: e.target.value,
-                        })
-                      }
-                      className={inputClass}
-                    >
-                      <option value="">Alle</option>
-                      {filterProducts.map((p) => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {filterAttrs.map((field) => (
-                  <div key={field.key}>
-                    <label className="block text-sm font-medium text-ink mb-1">{field.label}</label>
-                    <select
-                      value={attrFilters[field.key] ?? ""}
-                      onChange={(e) => pickAttr(field.key, e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Alle</option>
-                      {field.options.map((o) => (
-                        <option key={o} value={o}>{o}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-
-                <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Sted eller postnummer</label>
-                  <input
-                    value={filters.place}
-                    onChange={(e) => update("place", e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && runSearch()}
-                    className={inputClass}
-                    placeholder="f.eks. Oslo eller 0150"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Type annonse</label>
-                  <select value={filters.ad_type} onChange={(e) => update("ad_type", e.target.value)} className={inputClass}>
-                    <option value="">Alle</option>
-                    <option value="sale">Til salgs</option>
-                    <option value="giveaway">Gis bort</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-ink mb-2">Prisklasse</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-ink-muted mb-1">Fra</label>
-                      <input type="number" value={filters.min_price} onChange={(e) => update("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="0 kr" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-ink-muted mb-1">Til</label>
-                      <input type="number" value={filters.max_price} onChange={(e) => update("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="Maks" />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Tilstand</label>
-                  <select value={filters.condition} onChange={(e) => update("condition", e.target.value)} className={inputClass}>
-                    <option value="">Alle</option>
-                    <option value="new">Ny</option>
-                    <option value="like_new">Som ny</option>
-                    <option value="good">God</option>
-                    <option value="fair">Brukbar</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Sortering</label>
-                  <select value={filters.sort_by} onChange={(e) => update("sort_by", e.target.value)} className={inputClass}>
-                    <option value="newest">Nyeste først</option>
-                    <option value="price_asc">Pris: lav til høy</option>
-                    <option value="price_desc">Pris: høy til lav</option>
-                  </select>
-                </div>
-
-                <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
-                  Bruk filtre
-                </button>
-
+            {isOwn && (
+              <>
                 <button
-                  onClick={saveCurrentSearch}
-                  disabled={savingSearch}
-                  className="w-full border border-brand text-brand rounded-lg py-2 font-medium hover:bg-brand-lightest disabled:opacity-50"
+                  onClick={() => router.push("/profile/edit")}
+                  className="mt-4 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
                 >
-                  {savingSearch ? "Lagrer..." : "🔔 Lagre søk"}
+                  Rediger profil
                 </button>
-                {savedMsg && <p className="text-xs text-center text-ink-secondary">{savedMsg}</p>}
-
-                <button onClick={resetAll} className="w-full text-sm text-ink-secondary hover:text-brand underline">
-                  Nullstill
+                <button
+                  onClick={() => router.push("/my-reviews")}
+                  className="mt-2 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
+                >
+                  Vurderinger
                 </button>
-              </div>
-            </div>
-          </aside>
-        )}
-
-        <section className="flex-1">
-          <div className="flex items-center justify-between mb-5">
-            <h1 className="text-xl font-semibold text-ink">
-              {isSearchResult || filters.category ? "Søkeresultater" : "Siste annonser"}
-              <span className="text-ink-muted font-normal text-base ml-2">
-                ({listings.length})
-              </span>
-            </h1>
-            {(isSearchResult || filters.category) && (
-              <button onClick={resetAll} className="text-sm text-ink-secondary hover:text-brand underline">
-                Vis alle annonser
-              </button>
+                <button
+                  onClick={() => router.push("/saved-searches")}
+                  className="mt-2 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
+                >
+                  Lagrede søk
+                </button>
+              </>
             )}
           </div>
 
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="rounded-2xl overflow-hidden border border-line bg-surface">
-                  <div className="h-44 bg-subtle animate-pulse" />
-                  <div className="p-4 space-y-2">
-                    <div className="h-4 bg-subtle rounded animate-pulse" />
-                    <div className="h-4 w-1/2 bg-subtle rounded animate-pulse" />
-                  </div>
+          <div className="mt-6 pt-6 border-t border-line space-y-3 text-sm">
+            <div className="flex items-center gap-2 text-ink-secondary">
+              <span className="text-ink-muted">📋</span>
+              <span>{listings.length} aktive annonser</span>
+            </div>
+            {profile.city && (
+              <div className="flex items-center gap-2 text-ink-secondary">
+                <span className="text-ink-muted">📍</span>
+                <span>{profile.city}</span>
+              </div>
+            )}
+            {profile.phone && (
+              <div className="flex items-center gap-2 text-ink-secondary">
+                <span className="text-ink-muted">📞</span>
+                <span>{profile.phone}</span>
+              </div>
+            )}
+          </div>
+
+          {profile.bio && (
+            <div className="mt-6 pt-6 border-t border-line">
+              <h2 className="text-sm font-semibold text-ink mb-2">Om {displayName}</h2>
+              <p className="text-sm text-ink-secondary whitespace-pre-wrap leading-relaxed">{profile.bio}</p>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <section className="flex-1">
+        <h2 className="text-xl font-semibold text-ink mb-5">
+          Aktive annonser <span className="text-ink-muted font-normal text-base">({listings.length})</span>
+        </h2>
+
+        {listings.length === 0 ? (
+          <div className="bg-surface border border-line rounded-2xl p-16 text-center">
+            <p className="text-ink-secondary">Ingen aktive annonser.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            {listings.map((listing) => (
+              <div
+                key={listing.id}
+                onClick={() => router.push(`/listings/${listing.id}`)}
+                className="group cursor-pointer rounded-2xl overflow-hidden border border-line bg-surface shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className="h-44 w-full overflow-hidden bg-subtle">
+                  {listing.images && listing.images.length > 0 ? (
+                    <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : listings.length === 0 ? (
-            <div className="bg-surface border border-line rounded-2xl p-16 text-center">
-              <p className="text-ink-secondary">
-                {isSearchResult ? "Ingen annonser matcher søket ditt." : "Ingen annonser ennå."}
-              </p>
-            </div>
-          ) : (
+                <div className="p-4">
+                  <h3 className="font-medium truncate text-ink">{listing.title}</h3>
+                  <p className="font-semibold mt-1 text-lg text-ink">
+                    {(listing.price_ore / 100).toLocaleString("nb-NO")} kr
+                  </p>
+                  <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isOwn && favorites.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-xl font-semibold text-ink mb-5">Likte annonser</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {listings.map((listing) => (
+              {favorites.map((listing) => (
                 <div
                   key={listing.id}
                   onClick={() => router.push(`/listings/${listing.id}`)}
-                  className="group cursor-pointer rounded-2xl overflow-hidden border border-line bg-surface shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
+                  className="group cursor-pointer rounded-2xl overflow-hidden border border-line bg-surface shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
                 >
-                  <div className="h-44 w-full overflow-hidden bg-subtle relative">
-                    <button
-                      onClick={(e) => toggleLike(e, listing.id)}
-                      className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-surface/90 backdrop-blur flex items-center justify-center text-lg hover:scale-110 transition-transform shadow-sm"
-                      aria-label="Lik annonse"
-                    >
-                      {likedIds.has(listing.id) ? "❤️" : "🤍"}
-                    </button>
+                  <div className="h-40 w-full overflow-hidden bg-subtle">
                     {listing.images && listing.images.length > 0 ? (
                       <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
                     )}
-                    <span className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-surface/90 text-ink-secondary backdrop-blur">
-                      {listing.category}
-                    </span>
-                    {listing.ad_type === "giveaway" && (
-                      <span className="absolute bottom-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-brand text-white">
-                        Gis bort
-                      </span>
-                    )}
                   </div>
                   <div className="p-4">
                     <h3 className="font-medium truncate text-ink">{listing.title}</h3>
                     <p className="font-semibold mt-1 text-lg text-ink">
-                      {listing.ad_type === "giveaway" ? "Gratis" : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
+                      {(listing.price_ore / 100).toLocaleString("nb-NO")} kr
                     </p>
-                    <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}, {listing.county}</p>
+                    <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}</p>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </section>
-      </div>
-    </main>
-  );
-}
+          </div>
+        )}
 
-export default function HomePage() {
-  return (
-    <Suspense fallback={<main className="max-w-[1400px] mx-auto px-[5%] py-8 text-ink-secondary">Laster...</main>}>
-      <HomeInner />
-    </Suspense>
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold text-ink mb-5">
+            Vurderinger <span className="text-ink-muted font-normal text-base">({reviewCount})</span>
+          </h2>
+
+          {reviews.length === 0 ? (
+            <div className="bg-surface border border-line rounded-2xl p-10 text-center">
+              <p className="text-ink-secondary">Ingen vurderinger ennå.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((r) => {
+                const avg = (r.communication + r.reliability + r.as_described) / 3;
+                const reviewer = r.reviewer_display_name || r.reviewer_name;
+                return (
+                  <div key={r.id} className="bg-surface border border-line rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <span className="w-10 h-10 rounded-full bg-brand-lightest text-brand flex items-center justify-center font-bold shrink-0">
+                          {reviewer.charAt(0).toUpperCase()}
+                        </span>
+                        <div>
+                          <p className="font-medium text-ink">{reviewer}</p>
+                          <p className="text-xs text-ink-muted">
+                            {r.listing_title} ·{" "}
+                            {new Date(r.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "short", day: "numeric" })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StarRating value={Math.round(avg)} readOnly size="sm" />
+                        <span className="font-semibold text-ink text-sm">{avg.toFixed(1)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Kommunikasjon</span>
+                        <StarRating value={r.communication} readOnly size="sm" />
+                      </div>
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Pålitelighet</span>
+                        <StarRating value={r.reliability} readOnly size="sm" />
+                      </div>
+                      <div className="flex items-center justify-between sm:block">
+                        <span className="text-ink-secondary">Som beskrevet</span>
+                        <StarRating value={r.as_described} readOnly size="sm" />
+                      </div>
+                    </div>
+
+                    {r.comment && (
+                      <p className="mt-4 pt-4 border-t border-line text-ink whitespace-pre-wrap">{r.comment}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
   );
 }
