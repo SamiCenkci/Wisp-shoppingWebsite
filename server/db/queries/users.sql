@@ -31,5 +31,6 @@ RETURNING *;
 -- name: ListActiveListingsByUser :many
 SELECT * FROM listings
 WHERE user_id = $1 AND status = 'active'
+  AND deleted_at IS NULL
   AND created_at > NOW() - INTERVAL '60 days'
 ORDER BY created_at DESC;
