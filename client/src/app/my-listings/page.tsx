@@ -36,20 +36,21 @@ export default function MyListingsPage() {
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [reviewable, setReviewable] = useState<Record<string, boolean>>({});
   const [soldModal, setSoldModal] = useState<{ listingId: string; title: string } | null>(null);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [loadingBuyers, setLoadingBuyers] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
-  const [reviewable, setReviewable] = useState<Record<string, boolean>>({});
-  
+
   function load() {
     api("/api/listings/mine")
       .then((data) => setListings(data ?? []))
-      .catch((err) => setError(err.message))
+      .catch((err) => setLoadError(err.message))
       .finally(() => setLoading(false));
   }
 
@@ -65,6 +66,7 @@ export default function MyListingsPage() {
     return () => window.removeEventListener("click", closeOnOutside);
   }, []);
 
+  // Ask the backend which sold listings this user may still review.
   useEffect(() => {
     const sold = listings.filter((l) => l.status === "sold");
     if (sold.length === 0) return;
@@ -77,28 +79,30 @@ export default function MyListingsPage() {
     ).then((pairs) => setReviewable(Object.fromEntries(pairs)));
   }, [listings]);
 
-  async function handleDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     setDeleteTarget(null);
+    setActionError("");
     try {
       await api(`/api/listings/${id}`, { method: "DELETE" });
       setListings((prev) => prev.filter((l) => l.id !== id));
-    } catch (err) {error && (
-          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
-        )}
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Sletting feilet");
+    }
   }
 
   async function setStatus(id: string, status: string) {
+    setActionError("");
     try {
       await api(`/api/listings/${id}/status`, {
         method: "PUT",
         body: JSON.stringify({ status }),
       });
       setListings((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
-    } catch (err) {error && (
-          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
-        )}
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Kunne ikke oppdatere");
+    }
   }
 
   async function openSoldModal(listingId: string, title: string) {
@@ -116,6 +120,7 @@ export default function MyListingsPage() {
 
   async function confirmSold(buyerId: string) {
     if (!soldModal) return;
+    setActionError("");
     try {
       await api(`/api/listings/${soldModal.listingId}/sold`, {
         method: "PUT",
@@ -126,7 +131,8 @@ export default function MyListingsPage() {
       );
       setSoldModal(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke markere som solgt");
+      setSoldModal(null);
+      setActionError(err instanceof Error ? err.message : "Kunne ikke markere som solgt");
     }
   }
 
@@ -181,10 +187,16 @@ export default function MyListingsPage() {
       </aside>
 
       <section className="flex-1">
+        {actionError && (
+          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
+
         {loading ? (
           <p className="text-ink-secondary">Laster...</p>
-        ) : error ? (
-          <p className="text-red-600">{error}</p>
+        ) : loadError ? (
+          <p className="text-red-600">{loadError}</p>
         ) : filtered.length === 0 ? (
           <div className="bg-surface border border-line rounded-2xl p-16 text-center">
             <p className="text-ink-secondary">Ingen annonser her.</p>
@@ -351,13 +363,14 @@ export default function MyListingsPage() {
           </div>
         </div>
       )}
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Slette annonsen?"
         message={deleteTarget ? `"${deleteTarget.title}" blir borte for godt.` : undefined}
         confirmLabel="Slett"
         danger
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
     </main>
