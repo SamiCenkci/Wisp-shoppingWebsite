@@ -45,8 +45,7 @@ export default function MyListingsPage() {
   const [loadingBuyers, setLoadingBuyers] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [reviewable, setReviewable] = useState<Record<string, boolean>>({});
-  const [error, setError] = useState("");
-
+  
   function load() {
     api("/api/listings/mine")
       .then((data) => setListings(data ?? []))
