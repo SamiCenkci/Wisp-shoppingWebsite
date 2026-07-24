@@ -2,6 +2,7 @@ package listing
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -76,11 +77,24 @@ func (h *Handler) ListSavedSearches(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if searches == nil {
-		searches = []db.SavedSearch{}
+
+	// JSONB comes back as []byte, which Go base64-encodes by default. The outer
+	// field shadows the embedded one so attributes serialise as real JSON.
+	type savedSearchOut struct {
+		db.SavedSearch
+		Attributes json.RawMessage `json:"attributes"`
 	}
 
-	c.JSON(http.StatusOK, searches)
+	out := make([]savedSearchOut, 0, len(searches))
+	for _, s := range searches {
+		attrs := s.Attributes
+		if len(attrs) == 0 {
+			attrs = []byte("{}")
+		}
+		out = append(out, savedSearchOut{SavedSearch: s, Attributes: attrs})
+	}
+
+	c.JSON(http.StatusOK, out)
 }
 
 // DELETE /api/saved-searches/:id

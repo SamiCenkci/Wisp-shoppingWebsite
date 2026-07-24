@@ -82,9 +82,16 @@ export default function SavedSearchesPage() {
     if (s.category) parts.push(s.category);
     if (s.sub_category) parts.push(s.sub_category);
     if (s.product_category) parts.push(s.product_category);
-    Object.entries(s.attributes ?? {}).forEach(([k, v]) => {
-      if (v) parts.push(`${ATTRIBUTE_LABELS[k] ?? k}: ${v}`);
-    });
+
+    // Guard the type: if the API ever sends a string instead of an object,
+    // Object.entries would iterate it character by character.
+    const attrs = s.attributes;
+    if (attrs && typeof attrs === "object") {
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (v) parts.push(`${ATTRIBUTE_LABELS[k] ?? k}: ${v}`);
+      });
+    }
+
     if (s.place) parts.push(`📍 ${s.place}`);
     if (s.condition) parts.push(conditionLabels[s.condition] ?? s.condition);
     if (s.ad_type === "giveaway") parts.push("Gis bort");
