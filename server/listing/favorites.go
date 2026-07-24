@@ -83,17 +83,6 @@ func (h *Handler) MyFavorites(c *gin.Context) {
 		return
 	}
 
-	type listingWithImages struct {
-		db.Listing
-		Images []db.ListingImage `json:"images"`
-	}
-	out := make([]listingWithImages, 0, len(listings))
-	for _, l := range listings {
-		imgs, _ := h.Queries.GetImagesByListing(context.Background(), l.ID)
-		if imgs == nil {
-			imgs = []db.ListingImage{}
-		}
-		out = append(out, listingWithImages{Listing: l, Images: imgs})
-	}
-	c.JSON(http.StatusOK, out)
+	// Everything here is favorited by definition, so pass a nil liked set.
+	c.JSON(http.StatusOK, attach(listings, h.imagesFor(listings), nil))
 }

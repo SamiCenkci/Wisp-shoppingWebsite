@@ -94,6 +94,40 @@ func (q *Queries) DeleteListing(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const getImagesByListings = `-- name: GetImagesByListings :many
+SELECT id, listing_id, url, caption, sort_order FROM listing_images
+WHERE listing_id = ANY($1::uuid[])
+ORDER BY listing_id, sort_order
+`
+
+// Batched form of GetImagesByListing, so rendering N listings costs one
+// query instead of N. Ordered by listing so the caller can group in one pass.
+func (q *Queries) GetImagesByListings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListingImage, error) {
+	rows, err := q.db.Query(ctx, getImagesByListings, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListingImage
+	for rows.Next() {
+		var i ListingImage
+		if err := rows.Scan(
+			&i.ID,
+			&i.ListingID,
+			&i.Url,
+			&i.Caption,
+			&i.SortOrder,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getListingByID = `-- name: GetListingByID :one
 SELECT id, user_id, title, description, price_ore, category, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at FROM listings WHERE id = $1
 `

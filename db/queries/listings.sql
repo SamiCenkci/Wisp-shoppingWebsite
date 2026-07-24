@@ -58,3 +58,10 @@ SELECT i.* FROM listing_images i
 JOIN listings l ON l.id = i.listing_id
 WHERE l.id = ANY(sqlc.slice('listing_ids'))
 ORDER BY i.listing_id, i.sort_order;
+
+-- name: GetImagesByListings :many
+-- Batched form of GetImagesByListing, so rendering N listings costs one
+-- query instead of N. Ordered by listing so the caller can group in one pass.
+SELECT * FROM listing_images
+WHERE listing_id = ANY($1::uuid[])
+ORDER BY listing_id, sort_order;

@@ -52,3 +52,10 @@ UPDATE listings SET status = 'sold', sold_to = $2 WHERE id = $1;
 
 -- name: IncrementViewCount :exec
 UPDATE listings SET view_count = view_count + 1 WHERE id = $1;
+
+-- name: GetImagesByListings :many
+-- Batched form of GetImagesByListing, so rendering N listings costs one
+-- query instead of N. Ordered by listing so the caller can group in one pass.
+SELECT * FROM listing_images
+WHERE listing_id = ANY($1::uuid[])
+ORDER BY listing_id, sort_order;

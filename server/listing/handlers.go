@@ -24,6 +24,58 @@ type Handler struct {
 	AlertSecret string
 }
 
+// listingWithImages is the shape every list endpoint returns.
+type listingWithImages struct {
+	db.Listing
+	Images    []db.ListingImage `json:"images"`
+	LikedByMe bool              `json:"liked_by_me"`
+}
+
+// imagesFor fetches images for a batch of listings in a single query and
+// returns them grouped by listing ID. Doing this per listing was an N+1:
+// twenty cards meant twenty-one round trips.
+func (h *Handler) imagesFor(listings []db.Listing) map[string][]db.ListingImage {
+	grouped := map[string][]db.ListingImage{}
+	if len(listings) == 0 {
+		return grouped
+	}
+
+	ids := make([]pgtype.UUID, 0, len(listings))
+	for _, l := range listings {
+		ids = append(ids, l.ID)
+	}
+
+	images, err := h.Queries.GetImagesByListings(context.Background(), ids)
+	if err != nil {
+		log.Printf("images: batch fetch failed: %v", err)
+		return grouped
+	}
+
+	for _, img := range images {
+		key := uuid.UUID(img.ListingID.Bytes).String()
+		grouped[key] = append(grouped[key], img)
+	}
+	return grouped
+}
+
+// attach pairs listings with their images and liked state.
+func attach(listings []db.Listing, images map[string][]db.ListingImage, liked map[string]bool) []listingWithImages {
+	out := make([]listingWithImages, 0, len(listings))
+	for _, l := range listings {
+		key := uuid.UUID(l.ID.Bytes).String()
+		imgs := images[key]
+		if imgs == nil {
+			imgs = []db.ListingImage{}
+		}
+		out = append(out, listingWithImages{
+			Listing:   l,
+			Images:    imgs,
+			LikedByMe: liked[key],
+		})
+	}
+	return out
+}
+
 type createRequest struct {
 	Title           string            `json:"title" binding:"required,max=100"`
 	Description     string            `json:"description" binding:"required,max=5000"`
@@ -43,13 +95,6 @@ type createRequest struct {
 	Images          []string          `json:"images"`
 }
 
-// listingWithImages is the shape every list endpoint returns.
-type listingWithImages struct {
-	db.Listing
-	Images    []db.ListingImage `json:"images"`
-	LikedByMe bool              `json:"liked_by_me"`
-}
-
 func (h *Handler) Create(c *gin.Context) {
 	var req createRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,8 +102,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	userIDStr := c.GetString("userID")
-	userID, err := uuid.Parse(userIDStr)
+	userID, err := uuid.Parse(c.GetString("userID"))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
 		return
@@ -87,7 +131,6 @@ func (h *Handler) Create(c *gin.Context) {
 		ProductCategory: req.ProductCategory,
 		Attributes:      attrsJSON(req.Attributes),
 	})
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -117,20 +160,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	liked := h.likedSet(c)
-	images := h.imagesFor(listings)
-
-	result := make([]listingWithImages, 0, len(listings))
-	for _, l := range listings {
-		key := uuid.UUID(l.ID.Bytes).String()
-		result = append(result, listingWithImages{
-			Listing:   l,
-			Images:    images[key],
-			LikedByMe: liked[key],
-		})
-	}
-
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, attach(listings, h.imagesFor(listings), h.likedSet(c)))
 }
 
 func (h *Handler) GetOne(c *gin.Context) {
@@ -145,16 +175,9 @@ func (h *Handler) GetOne(c *gin.Context) {
 		return
 	}
 
-	// Count this view in the background — the page shouldn't wait on a write.
-	go func(listingID pgtype.UUID) {
-		_ = h.Queries.IncrementViewCount(context.Background(), listingID)
-	}(listing.ID)
+	// Count this view (fire-and-forget; don't block on errors)
+	_ = h.Queries.IncrementViewCount(context.Background(), listing.ID)
 	listing.ViewCount = listing.ViewCount + 1
-
-	images, _ := h.Queries.GetImagesByListing(context.Background(), listing.ID)
-	if images == nil {
-		images = []db.ListingImage{}
-	}
 
 	seller, _ := h.Queries.GetUserByID(context.Background(), listing.UserID)
 
@@ -163,14 +186,13 @@ func (h *Handler) GetOne(c *gin.Context) {
 		ID:       listing.ID,
 	})
 
-	// One query for all four similar listings' images rather than four.
-	similarImages := h.imagesFor(similar)
-	similarOut := make([]listingWithImages, 0, len(similar))
-	for _, s := range similar {
-		similarOut = append(similarOut, listingWithImages{
-			Listing: s,
-			Images:  similarImages[uuid.UUID(s.ID.Bytes).String()],
-		})
+	// One query covers this listing's images and all the similar ones.
+	batch := append([]db.Listing{listing}, similar...)
+	images := h.imagesFor(batch)
+
+	mainImages := images[uuid.UUID(listing.ID.Bytes).String()]
+	if mainImages == nil {
+		mainImages = []db.ListingImage{}
 	}
 
 	likeCount, _ := h.Queries.CountFavorites(context.Background(), listing.ID)
@@ -193,8 +215,8 @@ func (h *Handler) GetOne(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"listing":     listing,
-		"images":      images,
-		"similar":     similarOut,
+		"images":      mainImages,
+		"similar":     attach(similar, images, nil),
 		"like_count":  likeCount,
 		"liked_by_me": likedByMe,
 		"attributes":  json.RawMessage(attrs),
@@ -342,25 +364,11 @@ func (h *Handler) Search(c *gin.Context) {
 		return
 	}
 
-	liked := h.likedSet(c)
-	images := h.imagesFor(results)
-
-	out := make([]listingWithImages, 0, len(results))
-	for _, l := range results {
-		key := uuid.UUID(l.ID.Bytes).String()
-		out = append(out, listingWithImages{
-			Listing:   l,
-			Images:    images[key],
-			LikedByMe: liked[key],
-		})
-	}
-
-	c.JSON(http.StatusOK, out)
+	c.JSON(http.StatusOK, attach(results, h.imagesFor(results), h.likedSet(c)))
 }
 
 func (h *Handler) Mine(c *gin.Context) {
-	userIDStr := c.GetString("userID")
-	userID, err := uuid.Parse(userIDStr)
+	userID, err := uuid.Parse(c.GetString("userID"))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
 		return
@@ -372,17 +380,7 @@ func (h *Handler) Mine(c *gin.Context) {
 		return
 	}
 
-	images := h.imagesFor(listings)
-
-	out := make([]listingWithImages, 0, len(listings))
-	for _, l := range listings {
-		out = append(out, listingWithImages{
-			Listing: l,
-			Images:  images[uuid.UUID(l.ID.Bytes).String()],
-		})
-	}
-
-	c.JSON(http.StatusOK, out)
+	c.JSON(http.StatusOK, attach(listings, h.imagesFor(listings), nil))
 }
 
 type statusRequest struct {
@@ -422,40 +420,6 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "status oppdatert"})
-}
-
-// imagesFor fetches images for many listings in one query and groups them by
-// listing ID. Calling GetImagesByListing per listing turns a 20-listing page
-// into 21 round trips, which dominates page load when the database is remote.
-func (h *Handler) imagesFor(listings []db.Listing) map[string][]db.ListingImage {
-	byListing := map[string][]db.ListingImage{}
-	if len(listings) == 0 {
-		return byListing
-	}
-
-	ids := make([]pgtype.UUID, 0, len(listings))
-	for _, l := range listings {
-		ids = append(ids, l.ID)
-	}
-
-	rows, err := h.Pool.Query(context.Background(),
-		"SELECT * FROM listing_images WHERE listing_id = ANY($1) ORDER BY listing_id, sort_order",
-		ids)
-	if err != nil {
-		return byListing
-	}
-	defer rows.Close()
-
-	all, err := pgx.CollectRows(rows, pgx.RowToStructByName[db.ListingImage])
-	if err != nil {
-		return byListing
-	}
-
-	for _, img := range all {
-		key := uuid.UUID(img.ListingID.Bytes).String()
-		byListing[key] = append(byListing[key], img)
-	}
-	return byListing
 }
 
 // pgFloat8 wraps a float64, treating 0 as "not set".
