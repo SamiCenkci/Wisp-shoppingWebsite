@@ -52,3 +52,9 @@ UPDATE listings SET status = 'sold', sold_to = $2 WHERE id = $1;
 
 -- name: IncrementViewCount :exec
 UPDATE listings SET view_count = view_count + 1 WHERE id = $1;
+
+-- name: GetImagesForActiveListings :many
+SELECT i.* FROM listing_images i
+JOIN listings l ON l.id = i.listing_id
+WHERE l.id = ANY(sqlc.slice('listing_ids'))
+ORDER BY i.listing_id, i.sort_order;

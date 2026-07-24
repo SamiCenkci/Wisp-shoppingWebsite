@@ -43,6 +43,13 @@ type createRequest struct {
 	Images          []string          `json:"images"`
 }
 
+// listingWithImages is the shape every list endpoint returns.
+type listingWithImages struct {
+	db.Listing
+	Images    []db.ListingImage `json:"images"`
+	LikedByMe bool              `json:"liked_by_me"`
+}
+
 func (h *Handler) Create(c *gin.Context) {
 	var req createRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -111,22 +118,15 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	liked := h.likedSet(c)
+	images := h.imagesFor(listings)
 
-	type listingWithImages struct {
-		db.Listing
-		Images    []db.ListingImage `json:"images"`
-		LikedByMe bool              `json:"liked_by_me"`
-	}
 	result := make([]listingWithImages, 0, len(listings))
 	for _, l := range listings {
-		imgs, _ := h.Queries.GetImagesByListing(context.Background(), l.ID)
-		if imgs == nil {
-			imgs = []db.ListingImage{}
-		}
+		key := uuid.UUID(l.ID.Bytes).String()
 		result = append(result, listingWithImages{
 			Listing:   l,
-			Images:    imgs,
-			LikedByMe: liked[uuid.UUID(l.ID.Bytes).String()],
+			Images:    images[key],
+			LikedByMe: liked[key],
 		})
 	}
 
@@ -145,11 +145,16 @@ func (h *Handler) GetOne(c *gin.Context) {
 		return
 	}
 
-	// Count this view (fire-and-forget; don't block on errors)
-	_ = h.Queries.IncrementViewCount(context.Background(), listing.ID)
+	// Count this view in the background — the page shouldn't wait on a write.
+	go func(listingID pgtype.UUID) {
+		_ = h.Queries.IncrementViewCount(context.Background(), listingID)
+	}(listing.ID)
 	listing.ViewCount = listing.ViewCount + 1
 
 	images, _ := h.Queries.GetImagesByListing(context.Background(), listing.ID)
+	if images == nil {
+		images = []db.ListingImage{}
+	}
 
 	seller, _ := h.Queries.GetUserByID(context.Background(), listing.UserID)
 
@@ -158,17 +163,14 @@ func (h *Handler) GetOne(c *gin.Context) {
 		ID:       listing.ID,
 	})
 
-	type listingWithImages struct {
-		db.Listing
-		Images []db.ListingImage `json:"images"`
-	}
+	// One query for all four similar listings' images rather than four.
+	similarImages := h.imagesFor(similar)
 	similarOut := make([]listingWithImages, 0, len(similar))
 	for _, s := range similar {
-		imgs, _ := h.Queries.GetImagesByListing(context.Background(), s.ID)
-		if imgs == nil {
-			imgs = []db.ListingImage{}
-		}
-		similarOut = append(similarOut, listingWithImages{Listing: s, Images: imgs})
+		similarOut = append(similarOut, listingWithImages{
+			Listing: s,
+			Images:  similarImages[uuid.UUID(s.ID.Bytes).String()],
+		})
 	}
 
 	likeCount, _ := h.Queries.CountFavorites(context.Background(), listing.ID)
@@ -341,22 +343,15 @@ func (h *Handler) Search(c *gin.Context) {
 	}
 
 	liked := h.likedSet(c)
+	images := h.imagesFor(results)
 
-	type listingWithImages struct {
-		db.Listing
-		Images    []db.ListingImage `json:"images"`
-		LikedByMe bool              `json:"liked_by_me"`
-	}
 	out := make([]listingWithImages, 0, len(results))
 	for _, l := range results {
-		imgs, _ := h.Queries.GetImagesByListing(context.Background(), l.ID)
-		if imgs == nil {
-			imgs = []db.ListingImage{}
-		}
+		key := uuid.UUID(l.ID.Bytes).String()
 		out = append(out, listingWithImages{
 			Listing:   l,
-			Images:    imgs,
-			LikedByMe: liked[uuid.UUID(l.ID.Bytes).String()],
+			Images:    images[key],
+			LikedByMe: liked[key],
 		})
 	}
 
@@ -377,17 +372,14 @@ func (h *Handler) Mine(c *gin.Context) {
 		return
 	}
 
-	type listingWithImages struct {
-		db.Listing
-		Images []db.ListingImage `json:"images"`
-	}
+	images := h.imagesFor(listings)
+
 	out := make([]listingWithImages, 0, len(listings))
 	for _, l := range listings {
-		imgs, _ := h.Queries.GetImagesByListing(context.Background(), l.ID)
-		if imgs == nil {
-			imgs = []db.ListingImage{}
-		}
-		out = append(out, listingWithImages{Listing: l, Images: imgs})
+		out = append(out, listingWithImages{
+			Listing: l,
+			Images:  images[uuid.UUID(l.ID.Bytes).String()],
+		})
 	}
 
 	c.JSON(http.StatusOK, out)
@@ -430,6 +422,40 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "status oppdatert"})
+}
+
+// imagesFor fetches images for many listings in one query and groups them by
+// listing ID. Calling GetImagesByListing per listing turns a 20-listing page
+// into 21 round trips, which dominates page load when the database is remote.
+func (h *Handler) imagesFor(listings []db.Listing) map[string][]db.ListingImage {
+	byListing := map[string][]db.ListingImage{}
+	if len(listings) == 0 {
+		return byListing
+	}
+
+	ids := make([]pgtype.UUID, 0, len(listings))
+	for _, l := range listings {
+		ids = append(ids, l.ID)
+	}
+
+	rows, err := h.Pool.Query(context.Background(),
+		"SELECT * FROM listing_images WHERE listing_id = ANY($1) ORDER BY listing_id, sort_order",
+		ids)
+	if err != nil {
+		return byListing
+	}
+	defer rows.Close()
+
+	all, err := pgx.CollectRows(rows, pgx.RowToStructByName[db.ListingImage])
+	if err != nil {
+		return byListing
+	}
+
+	for _, img := range all {
+		key := uuid.UUID(img.ListingID.Bytes).String()
+		byListing[key] = append(byListing[key], img)
+	}
+	return byListing
 }
 
 // pgFloat8 wraps a float64, treating 0 as "not set".
