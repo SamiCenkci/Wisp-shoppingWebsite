@@ -32,6 +32,8 @@ A few things it does that go beyond CRUD:
 - **Norwegian address autocomplete.** Integrates [Kartverket](https://ws.geonorge.no/adresser/v1/) (the national mapping authority) for address lookup, which fills postal code and place automatically and captures coordinates. The listing map shows an approximate area rather than an exact pin, since a seller's address is usually their home.
 - **Mutual reviews with real constraints.** Only the two parties in a completed sale can review each other, once each, and only after the seller records who they sold to. The authorisation rules live in a pure function with test coverage.
 - **Saved searches with alerts.** Users save a filter set and get emailed when matching listings appear. Render's free tier has no cron, so an external scheduler calls a secret-guarded endpoint — which also wakes the sleeping instance.
+> The live site is seeded with demo listings from a `Wisp Demo` account so the marketplace isn't empty. They behave like real listings but nobody is on the other end of them.
+ 
 ---
  
 ## Tech Stack
@@ -126,7 +128,7 @@ UUID primary keys throughout, with foreign keys enforcing referential integrity.
 | price_ore | integer | price in øre, avoiding float rounding |
 | category, sub_category, product_category | text | the three-level path |
 | attributes | jsonb | branch-specific fields, GIN indexed |
-| condition, ad_type, status | text | |
+| condition, ad_type, status | text | CHECK constrained |
 | county, municipality, postal_code, street_address | text | |
 | latitude, longitude | double precision | from Kartverket |
 | view_count | integer | |
@@ -188,6 +190,16 @@ npm run dev
 Frontend on `localhost:3000`, API on `localhost:8080`.
  
 See [`server/.env.example`](server/.env.example) for the required configuration.
+ 
+### Database
+Migrations are plain SQL in `server/db/migrations/`, applied in order:
+ 
+```bash
+psql "$DATABASE_URL" -f server/db/migrations/001_init.sql
+# …and so on
+```
+ 
+`server/db/seed/` holds optional demo data for a populated-looking marketplace.
  
 ---
  
