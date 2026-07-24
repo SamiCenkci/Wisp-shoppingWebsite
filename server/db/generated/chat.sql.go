@@ -129,6 +129,7 @@ SELECT DISTINCT u.id, u.name, u.display_name
 FROM conversations c
 JOIN users u ON u.id = c.buyer_id
 WHERE c.listing_id = $1
+  AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
 `
 
 type ListBuyersForListingRow struct {
@@ -137,6 +138,8 @@ type ListBuyersForListingRow struct {
 	DisplayName string      `json:"display_name"`
 }
 
+// Only buyers who actually wrote something — an empty conversation doesn't
+// mean someone was interested enough to be a real buyer.
 func (q *Queries) ListBuyersForListing(ctx context.Context, listingID pgtype.UUID) ([]ListBuyersForListingRow, error) {
 	rows, err := q.db.Query(ctx, listBuyersForListing, listingID)
 	if err != nil {
@@ -158,11 +161,14 @@ func (q *Queries) ListBuyersForListing(ctx context.Context, listingID pgtype.UUI
 }
 
 const listConversationsForUser = `-- name: ListConversationsForUser :many
-SELECT id, listing_id, buyer_id, seller_id, updated_at FROM conversations
-WHERE buyer_id = $1 OR seller_id = $1
-ORDER BY updated_at DESC
+SELECT c.id, c.listing_id, c.buyer_id, c.seller_id, c.updated_at FROM conversations c
+WHERE (c.buyer_id = $1 OR c.seller_id = $1)
+  AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
+ORDER BY c.updated_at DESC
 `
 
+// Empty conversations are hidden: clicking "Send melding til selger" creates one
+// before anything is written, and a thread with no messages is just noise.
 func (q *Queries) ListConversationsForUser(ctx context.Context, buyerID pgtype.UUID) ([]Conversation, error) {
 	rows, err := q.db.Query(ctx, listConversationsForUser, buyerID)
 	if err != nil {

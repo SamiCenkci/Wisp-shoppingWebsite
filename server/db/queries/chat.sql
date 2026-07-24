@@ -8,9 +8,12 @@ RETURNING *;
 SELECT * FROM conversations WHERE id = $1;
 
 -- name: ListConversationsForUser :many
-SELECT * FROM conversations
-WHERE buyer_id = $1 OR seller_id = $1
-ORDER BY updated_at DESC;
+-- Empty conversations are hidden: clicking "Send melding til selger" creates one
+-- before anything is written, and a thread with no messages is just noise.
+SELECT c.* FROM conversations c
+WHERE (c.buyer_id = $1 OR c.seller_id = $1)
+  AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
+ORDER BY c.updated_at DESC;
 
 -- name: CreateMessage :one
 INSERT INTO messages (conversation_id, sender_id, content, attachment_url, attachment_name)
@@ -43,7 +46,10 @@ WHERE conversation_id = $1
   AND read_at IS NULL;
 
 -- name: ListBuyersForListing :many
+-- Only buyers who actually wrote something — an empty conversation doesn't
+-- mean someone was interested enough to be a real buyer.
 SELECT DISTINCT u.id, u.name, u.display_name
 FROM conversations c
 JOIN users u ON u.id = c.buyer_id
-WHERE c.listing_id = $1;
+WHERE c.listing_id = $1
+  AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id);
