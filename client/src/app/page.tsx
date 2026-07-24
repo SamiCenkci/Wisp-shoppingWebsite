@@ -51,6 +51,8 @@ function HomeInner() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [searchName, setSearchName] = useState("");
 
   function seedLiked(data: Listing[]) {
     const ids = new Set<string>();
@@ -84,6 +86,7 @@ function HomeInner() {
     const product = searchParams.get("product") ?? "";
 
     setAttrFilters({});
+    setSavedMsg("");
 
     if (q || category) {
       setFilters((prev) => ({
@@ -159,47 +162,6 @@ function HomeInner() {
     navigate({});
   }
 
-  async function saveCurrentSearch() {
-    if (!localStorage.getItem("token")) {
-      router.push("/login");
-      return;
-    }
-    const suggested =
-      filters.query ||
-      filters.product_category ||
-      filters.sub_category ||
-      filters.category ||
-      "Mitt søk";
-    const name = window.prompt("Gi søket et navn:", suggested);
-    if (!name) return;
-
-    setSavingSearch(true);
-    setSavedMsg("");
-    try {
-      await api("/api/saved-searches", {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          query: filters.query,
-          category: filters.category,
-          sub_category: filters.sub_category,
-          product_category: filters.product_category,
-          attributes: attrFilters,
-          place: filters.place,
-          condition: filters.condition,
-          ad_type: filters.ad_type,
-          min_price: filters.min_price ? Math.round(parseFloat(filters.min_price) * 100) : 0,
-          max_price: filters.max_price ? Math.round(parseFloat(filters.max_price) * 100) : 0,
-        }),
-      });
-      setSavedMsg("Søket er lagret ✓");
-    } catch (err) {
-      setSavedMsg(err instanceof Error ? err.message : "Kunne ikke lagre søket");
-    } finally {
-      setSavingSearch(false);
-    }
-  }
-
   function pickCategory(cat: string) {
     navigate({ category: filters.category === cat ? "" : cat });
   }
@@ -223,6 +185,53 @@ function HomeInner() {
     const next = { ...attrFilters, [key]: value };
     setAttrFilters(next);
     runSearch(undefined, next);
+  }
+
+  function openSaveDialog() {
+    if (!localStorage.getItem("token")) {
+      router.push("/login");
+      return;
+    }
+    // Suggest the most specific thing the user is currently browsing.
+    setSearchName(
+      filters.query ||
+        filters.product_category ||
+        filters.sub_category ||
+        filters.category ||
+        "Mitt søk"
+    );
+    setSavedMsg("");
+    setNameModalOpen(true);
+  }
+
+  async function saveCurrentSearch() {
+    if (!searchName.trim()) return;
+    setSavingSearch(true);
+    setSavedMsg("");
+    try {
+      await api("/api/saved-searches", {
+        method: "POST",
+        body: JSON.stringify({
+          name: searchName.trim(),
+          query: filters.query,
+          category: filters.category,
+          sub_category: filters.sub_category,
+          product_category: filters.product_category,
+          attributes: attrFilters,
+          place: filters.place,
+          condition: filters.condition,
+          ad_type: filters.ad_type,
+          min_price: filters.min_price ? Math.round(parseFloat(filters.min_price) * 100) : 0,
+          max_price: filters.max_price ? Math.round(parseFloat(filters.max_price) * 100) : 0,
+        }),
+      });
+      setNameModalOpen(false);
+      setSavedMsg("Søket er lagret ✓");
+    } catch (err) {
+      setSavedMsg(err instanceof Error ? err.message : "Kunne ikke lagre søket");
+    } finally {
+      setSavingSearch(false);
+    }
   }
 
   async function toggleLike(e: React.MouseEvent, id: string) {
@@ -439,17 +448,22 @@ function HomeInner() {
                     <option value="price_desc">Pris: høy til lav</option>
                   </select>
                 </div>
+
+                <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
+                  Bruk filtre
+                </button>
+
                 <button
-                  onClick={saveCurrentSearch}
+                  onClick={openSaveDialog}
                   disabled={savingSearch}
                   className="w-full border border-brand text-brand rounded-lg py-2 font-medium hover:bg-brand-lightest disabled:opacity-50"
                 >
                   {savingSearch ? "Lagrer..." : "🔔 Lagre søk"}
                 </button>
-                {savedMsg && <p className="text-xs text-center text-ink-secondary">{savedMsg}</p>}
-                <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
-                  Bruk filtre
-                </button>
+                {savedMsg && !nameModalOpen && (
+                  <p className="text-xs text-center text-ink-secondary">{savedMsg}</p>
+                )}
+
                 <button onClick={resetAll} className="w-full text-sm text-ink-secondary hover:text-brand underline">
                   Nullstill
                 </button>
@@ -534,6 +548,51 @@ function HomeInner() {
           )}
         </section>
       </div>
+
+      {nameModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setNameModalOpen(false)}
+        >
+          <div
+            className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-sm p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-ink mb-1">Lagre søket</h2>
+            <p className="text-sm text-ink-secondary mb-4">
+              Du får en e-post når det kommer nye annonser som matcher.
+            </p>
+
+            <label className="block text-sm font-medium text-ink mb-1.5">Navn på søket</label>
+            <input
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveCurrentSearch()}
+              maxLength={100}
+              autoFocus
+              className="w-full border border-line rounded-xl px-3.5 py-2.5 bg-surface outline-none focus:border-brand"
+            />
+
+            {savedMsg && <p className="text-sm text-ink-secondary mt-3">{savedMsg}</p>}
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setNameModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-line text-ink-secondary font-medium hover:text-ink"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={saveCurrentSearch}
+                disabled={savingSearch || !searchName.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark disabled:opacity-50"
+              >
+                {savingSearch ? "Lagrer..." : "Lagre"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
