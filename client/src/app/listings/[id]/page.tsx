@@ -16,13 +16,14 @@ const conditionLabels: Record<string, string> = {
   fair: "Brukbar",
 };
 
-const attrLabels: Record<string, string> = {
-  plattform: "Plattform",
-  storrelse: "Størrelse",
-  skostorrelse: "Skostørrelse",
-  drivstoff: "Drivstoff",
-  sykkeltype: "Type sykkel",
-};
+const reportReasons = [
+  { value: "svindel", label: "Mistanke om svindel" },
+  { value: "upassende", label: "Upassende innhold" },
+  { value: "feil_kategori", label: "Feil kategori" },
+  { value: "duplikat", label: "Duplikat av annen annonse" },
+  { value: "solgt", label: "Varen er allerede solgt" },
+  { value: "annet", label: "Annet" },
+];
 
 type Image = { id: string; url: string };
 type Listing = {
@@ -74,7 +75,12 @@ export default function ListingDetailPage() {
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [loadingBuyers, setLoadingBuyers] = useState(false);
   const [attributes, setAttributes] = useState<Record<string, string>>({});
-  
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportMsg, setReportMsg] = useState("");
+  const [reporting, setReporting] = useState(false);
+
   function loadListing() {
     return api(`/api/listings/${params.id}`).then((data) => {
       setListing(data.listing);
@@ -83,24 +89,12 @@ export default function ListingDetailPage() {
       setSeller(data.seller ?? null);
       setLikeCount(data.like_count ?? 0);
       setLiked(data.liked_by_me ?? false);
+      setAttributes(data.attributes && typeof data.attributes === "object" ? data.attributes : {});
       const stored = localStorage.getItem("user");
       if (stored && data.seller) {
         try {
           const me = JSON.parse(stored);
           setIsOwn(me.id === data.seller.id);
-          useEffect(() => {
-    if (!listing || listing.status !== "sold") {
-      setCanReview(false);
-      return;
-    }
-    if (!localStorage.getItem("token")) {
-      setCanReview(false);
-      return;
-    }
-    api(`/api/listings/${listing.id}/can-review`)
-      .then((data) => setCanReview(Boolean(data.can_review)))
-      .catch(() => setCanReview(false));
-  }, [listing]);
         } catch {}
       }
       return data;
@@ -115,6 +109,22 @@ export default function ListingDetailPage() {
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  // Ask the backend whether a review is still possible, so the button
+  // disappears once this user has already reviewed.
+  useEffect(() => {
+    if (!listing || listing.status !== "sold") {
+      setCanReview(false);
+      return;
+    }
+    if (!localStorage.getItem("token")) {
+      setCanReview(false);
+      return;
+    }
+    api(`/api/listings/${listing.id}/can-review`)
+      .then((data) => setCanReview(Boolean(data.can_review)))
+      .catch(() => setCanReview(false));
+  }, [listing]);
 
   async function openSoldModal() {
     setSoldModal(true);
@@ -155,7 +165,6 @@ export default function ListingDetailPage() {
       });
       const data = await api(`/api/listings/${listing.id}`);
       setLikeCount(data.like_count ?? 0);
-      setAttributes(data.attributes && typeof data.attributes === "object" ? data.attributes : {});
       setLiked(data.liked_by_me ?? false);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Kunne ikke oppdatere");
@@ -180,10 +189,35 @@ export default function ListingDetailPage() {
     }
   }
 
+  async function submitReport() {
+    if (!localStorage.getItem("token")) {
+      router.push("/login");
+      return;
+    }
+    if (!reportReason) {
+      setReportMsg("Velg en årsak.");
+      return;
+    }
+    setReporting(true);
+    setReportMsg("");
+    try {
+      await api(`/api/listings/${params.id}/report`, {
+        method: "POST",
+        body: JSON.stringify({ reason: reportReason, details: reportDetails }),
+      });
+      setReportMsg("Takk. Rapporten er mottatt.");
+      setTimeout(() => setReportOpen(false), 1500);
+    } catch (err) {
+      setReportMsg(err instanceof Error ? err.message : "Kunne ikke sende rapporten");
+    } finally {
+      setReporting(false);
+    }
+  }
+
   if (loading) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
   if (error) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-red-600">{error}</p>;
   if (!listing) return <p className="max-w-3xl mx-auto px-[5%] py-10">Annonse ikke funnet.</p>;
-  
+
   if (listing.deleted_at) {
     return (
       <main className="max-w-2xl mx-auto px-[5%] py-16 text-center">
@@ -287,12 +321,15 @@ export default function ListingDetailPage() {
               )}
             </dl>
           )}
+
           <p className="mt-5 text-ink whitespace-pre-wrap">{listing.description}</p>
+
           <div className="mt-5 pt-5 border-t border-line text-sm text-ink-secondary space-y-1">
             <p>📍 {listing.municipality}, {listing.county}</p>
             <p>⏱ {expiryLabel(listing.created_at)}</p>
             <p>👁 {listing.view_count ?? 0} visninger</p>
           </div>
+
           {listing.latitude && listing.longitude ? (
             <div className="mt-5">
               <p className="text-sm font-medium text-ink mb-2">Omtrentlig område</p>
@@ -365,6 +402,15 @@ export default function ListingDetailPage() {
               </div>
               <span className="text-brand text-sm">Se profil →</span>
             </div>
+          )}
+
+          {!isOwn && (
+            <button
+              onClick={() => setReportOpen(true)}
+              className="mt-4 w-full text-sm text-ink-muted hover:text-red-600 underline"
+            >
+              🚩 Rapporter annonsen
+            </button>
           )}
         </div>
       </div>
@@ -439,6 +485,63 @@ export default function ListingDetailPage() {
             >
               Avbryt
             </button>
+          </div>
+        </div>
+      )}
+
+      {reportOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setReportOpen(false)}
+        >
+          <div
+            className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-ink mb-1">Rapporter annonsen</h2>
+            <p className="text-sm text-ink-secondary mb-5">
+              Rapporten går til moderatorene våre. Vi ser på alle innmeldinger.
+            </p>
+
+            <label className="block text-sm font-medium text-ink mb-1.5">Årsak</label>
+            <select
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              className="w-full border border-line rounded-xl px-3.5 py-2.5 bg-surface outline-none focus:border-brand mb-4"
+            >
+              <option value="">Velg årsak...</option>
+              {reportReasons.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+
+            <label className="block text-sm font-medium text-ink mb-1.5">Utdyp (valgfritt)</label>
+            <textarea
+              value={reportDetails}
+              onChange={(e) => setReportDetails(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              className="w-full border border-line rounded-xl px-3.5 py-2.5 bg-surface outline-none focus:border-brand"
+              placeholder="Beskriv kort hva som er problemet..."
+            />
+
+            {reportMsg && <p className="text-sm text-ink-secondary mt-3">{reportMsg}</p>}
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setReportOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-line text-ink-secondary font-medium hover:text-ink"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={submitReport}
+                disabled={reporting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {reporting ? "Sender..." : "Send rapport"}
+              </button>
+            </div>
           </div>
         </div>
       )}

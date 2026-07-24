@@ -69,6 +69,16 @@ type Message struct {
 	AttachmentName string             `json:"attachment_name"`
 }
 
+type Report struct {
+	ID         pgtype.UUID        `json:"id"`
+	ListingID  pgtype.UUID        `json:"listing_id"`
+	ReporterID pgtype.UUID        `json:"reporter_id"`
+	Reason     string             `json:"reason"`
+	Details    string             `json:"details"`
+	Status     string             `json:"status"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type Review struct {
 	ID             pgtype.UUID        `json:"id"`
 	ListingID      pgtype.UUID        `json:"listing_id"`
@@ -128,6 +138,7 @@ type User struct {
 	City          string             `json:"city"`
 	Country       string             `json:"country"`
 	VerifiedAt    pgtype.Timestamptz `json:"verified_at"`
+	IsAdmin       bool               `json:"is_admin"`
 }
 
 type VerificationToken struct {

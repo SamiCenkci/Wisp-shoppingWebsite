@@ -99,6 +99,7 @@ func (h *Handler) Login(c *gin.Context) {
 			"email":    user.Email,
 			"name":     user.Name,
 			"verified": user.VerifiedAt.Valid,
+			"is_admin": user.IsAdmin,
 		},
 	})
 }

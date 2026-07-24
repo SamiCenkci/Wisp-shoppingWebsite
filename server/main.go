@@ -126,6 +126,12 @@ func main() {
 
 		// Triggered by an external scheduler, guarded by X-Alert-Secret.
 		api.POST("/internal/run-alerts", listingHandler.RunAlerts)
+
+		api.POST("/listings/:id/report", auth.RequireAuth(cfg.JWTSecret), listingHandler.ReportListing)
+
+		api.GET("/admin/reports", auth.RequireAuth(cfg.JWTSecret), listingHandler.ListReports)
+		api.PUT("/admin/reports/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.UpdateReportStatus)
+		api.DELETE("/admin/listings/:id", auth.RequireAuth(cfg.JWTSecret), listingHandler.AdminDeleteListing)
 	}
 
 	router.Run(":" + cfg.Port)
