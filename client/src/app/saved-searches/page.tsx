@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { ATTRIBUTE_LABELS } from "@/lib/categories";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type SavedSearch = {
   id: string;
@@ -32,6 +33,8 @@ export default function SavedSearchesPage() {
   const router = useRouter();
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [error, setError] = useState("");
 
   function load() {
     api("/api/saved-searches")
@@ -49,12 +52,16 @@ export default function SavedSearchesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function remove(id: string) {
+  async function confirmRemove() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
+    setError("");
     try {
       await api(`/api/saved-searches/${id}`, { method: "DELETE" });
       setSearches((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke slette");
+      setError(err instanceof Error ? err.message : "Kunne ikke slette");
     }
   }
 
@@ -94,6 +101,10 @@ export default function SavedSearchesPage() {
         Du får en e-post når det kommer nye annonser som matcher.
       </p>
 
+      {error && (
+        <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
       {loading ? (
         <p className="text-ink-secondary">Laster...</p>
       ) : searches.length === 0 ? (
@@ -126,7 +137,7 @@ export default function SavedSearchesPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => remove(s.id)}
+                  onClick={() => setDeleteTarget({ id: s.id, name: s.name })}
                   className="shrink-0 text-sm text-red-600 hover:text-red-700 font-medium"
                 >
                   Slett
@@ -143,6 +154,16 @@ export default function SavedSearchesPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Slette det lagrede søket?"
+        message={deleteTarget ? `«${deleteTarget.name}» blir borte, og du får ikke lenger varsler for det.` : undefined}
+        confirmLabel="Slett"
+        danger
+        onConfirm={confirmRemove}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </main>
   );
 }
