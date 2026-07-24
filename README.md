@@ -4,24 +4,6 @@ A full-stack secondhand marketplace for the Norwegian market, inspired by [Finn.
  
 🔗 **Live:** [wispapp.net](https://wispapp.net)
  
----
- 
-## 📸 Screenshots
- 
-### Homepage — category navigation and listings
-![Homepage](docs/screenshots/home.png)
- 
-### Listing detail — gallery, attributes, seller, and location
-![Listing detail](docs/screenshots/listing.png)
- 
-### Chat — messaging with file sharing
-![Chat](docs/screenshots/chat.png)
- 
-### Dark mode
-![Dark mode](docs/screenshots/dark.png)
- 
----
- 
 ## Overview
  
 Wisp was built end to end: schema design, a typed API, a component-driven frontend, transactional email, and a multi-service cloud deployment behind a custom domain.
@@ -41,7 +23,7 @@ A few things it does that go beyond CRUD:
 | Layer | Technologies |
 |-------|-------------|
 | **Frontend** | Next.js 16 (App Router), TypeScript, Tailwind CSS v4 — deployed on **Vercel** |
-| **Backend** | Go, Gin, JWT (HS256), bcrypt, Gorilla WebSocket — deployed on **Render** |
+| **Backend** | Go, Gin, JWT (HS256), bcrypt, Gorilla WebSocket — deployed on **Render** (Frankfurt) |
 | **Database** | **Neon** managed PostgreSQL, SQLC for type-safe queries, pgx/v5, `pg_trgm` for fuzzy search, JSONB + GIN for attributes |
 | **Storage** | AWS S3 via presigned uploads, with browser-side image compression |
 | **Email** | Resend — verification, review requests, price-drop and saved-search alerts |
@@ -71,6 +53,7 @@ A few things it does that go beyond CRUD:
 - Buyer–seller messaging with image and file attachments
 - Unread badges in the navbar and per conversation
 - Polling-based delivery (Render's free tier doesn't hold WebSockets reliably)
+- Conversations only appear once something has been sent, so browsing doesn't leave empty threads behind
 ### Favorites & Reviews
 - Like listings, with public counts and a private saved list
 - Favoriters are emailed when a price drops
@@ -85,6 +68,16 @@ A few things it does that go beyond CRUD:
 - Responsive layout with light and dark mode
 - FAQ chatbot with persistent history
 - About, Help and Privacy pages
+---
+ 
+## Performance
+ 
+Two things made a measurable difference:
+ 
+**Batched image loading.** The listing handlers originally fetched images one listing at a time — rendering twenty cards meant twenty-one queries. Collecting the IDs and fetching all images in a single `WHERE listing_id = ANY($1)` brought the homepage down to two queries.
+ 
+**Co-locating the API and database.** The Go service originally ran in Virginia while the database sat in London, so every query crossed the Atlantic — around 80ms each way. Moving the service to Frankfurt cut that to roughly 15ms, which compounds across the queries a page needs.
+ 
 ---
  
 ## Architecture
@@ -205,6 +198,6 @@ psql "$DATABASE_URL" -f server/db/migrations/001_init.sql
  
 ## Notes
  
-Built to learn full-stack development properly — not just making features work, but handling the parts that only show up in a real deployment: environment-based config, CORS across separate origins, keeping secrets out of version control, soft deletes so one user's action can't destroy another's history, and rate limiting on endpoints that would otherwise be brute-forceable.
+Built to learn full-stack development properly — not just making features work, but handling the parts that only show up in a real deployment: environment-based config, CORS across separate origins, keeping secrets out of version control, soft deletes so one user's action can't destroy another's history, rate limiting on endpoints that would otherwise be brute-forceable, and finding the N+1 that made every page slower than it needed to be.
  
 Built by **Sami Cenkci** — [GitHub](https://github.com/SamiCenkci)
