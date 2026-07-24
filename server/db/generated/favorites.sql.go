@@ -81,7 +81,7 @@ func (q *Queries) ListFavoriteIDsByUser(ctx context.Context, userID pgtype.UUID)
 }
 
 const listFavoriteListingsByUser = `-- name: ListFavoriteListingsByUser :many
-SELECT l.id, l.user_id, l.title, l.description, l.price_ore, l.category, l.subcategory, l.condition, l.county, l.municipality, l.created_at, l.updated_at, l.status, l.ad_type, l.view_count, l.sold_to, l.latitude, l.longitude, l.street_address, l.postal_code, l.sub_category, l.product_category, l.attributes, l.deleted_at FROM listings l
+SELECT l.id, l.user_id, l.title, l.description, l.price_ore, l.category, l.condition, l.county, l.municipality, l.created_at, l.updated_at, l.status, l.ad_type, l.view_count, l.sold_to, l.latitude, l.longitude, l.street_address, l.postal_code, l.sub_category, l.product_category, l.attributes, l.deleted_at FROM listings l
 JOIN favorites f ON f.listing_id = l.id
 WHERE f.user_id = $1 AND l.deleted_at IS NULL
 ORDER BY f.created_at DESC
@@ -103,7 +103,6 @@ func (q *Queries) ListFavoriteListingsByUser(ctx context.Context, userID pgtype.
 			&i.Description,
 			&i.PriceOre,
 			&i.Category,
-			&i.Subcategory,
 			&i.Condition,
 			&i.County,
 			&i.Municipality,

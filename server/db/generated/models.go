@@ -30,7 +30,6 @@ type Listing struct {
 	Description     string             `json:"description"`
 	PriceOre        int32              `json:"price_ore"`
 	Category        string             `json:"category"`
-	Subcategory     pgtype.Text        `json:"subcategory"`
 	Condition       string             `json:"condition"`
 	County          string             `json:"county"`
 	Municipality    string             `json:"municipality"`

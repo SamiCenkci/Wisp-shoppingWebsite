@@ -81,7 +81,7 @@ SET url = 'https://samicenkci-marketplace-images.s3.eu-north-1.amazonaws.com/lis
 WHERE listing_id = (SELECT id FROM listings WHERE title = 'Sofabord i glass - gis bort' AND deleted_at IS NULL);
  
 -- Sanity check: any listing still pointing at a placeholder didn't get updated.
-SELECT l.title, i.url
+SELECT l.title, i.urls
 FROM listings l
 JOIN listing_images i ON i.listing_id = l.id
 WHERE l.deleted_at IS NULL
