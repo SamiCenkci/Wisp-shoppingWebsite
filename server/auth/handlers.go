@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
@@ -47,7 +46,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.Queries.CreateUser(context.Background(), db.CreateUserParams{
+	user, err := h.Queries.CreateUser(c.Request.Context(), db.CreateUserParams{
 		Email:        req.Email,
 		PasswordHash: hash,
 		Name:         req.Name,
@@ -58,7 +57,7 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 
 	// Send the confirmation link. Runs in the background and never fails signup.
-	h.IssueVerification(uuid.UUID(user.ID.Bytes), user.Email, user.Name)
+	h.IssueVerification(c.Request.Context(), uuid.UUID(user.ID.Bytes), user.Email, user.Name)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":    user.ID,
@@ -75,7 +74,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.Queries.GetUserByEmail(context.Background(), req.Email)
+	user, err := h.Queries.GetUserByEmail(c.Request.Context(), req.Email)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
 		return

@@ -1,7 +1,6 @@
 package listing
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -43,7 +42,7 @@ func (h *Handler) CreateSavedSearch(c *gin.Context) {
 		return
 	}
 
-	saved, err := h.Queries.CreateSavedSearch(context.Background(), db.CreateSavedSearchParams{
+	saved, err := h.Queries.CreateSavedSearch(c.Request.Context(), db.CreateSavedSearchParams{
 		UserID:          pgUUID(userID),
 		Name:            req.Name,
 		Query:           req.Query,
@@ -73,7 +72,7 @@ func (h *Handler) ListSavedSearches(c *gin.Context) {
 		return
 	}
 
-	searches, err := h.Queries.ListSavedSearchesByUser(context.Background(), pgUUID(userID))
+	searches, err := h.Queries.ListSavedSearchesByUser(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -112,7 +111,7 @@ func (h *Handler) DeleteSavedSearch(c *gin.Context) {
 	}
 
 	// The query only matches when user_id belongs to the caller.
-	if err := h.Queries.DeleteSavedSearch(context.Background(), db.DeleteSavedSearchParams{
+	if err := h.Queries.DeleteSavedSearch(c.Request.Context(), db.DeleteSavedSearchParams{
 		ID:     pgUUID(searchID),
 		UserID: pgUUID(userID),
 	}); err != nil {
@@ -133,7 +132,7 @@ func (h *Handler) RunAlerts(c *gin.Context) {
 		return
 	}
 
-	searches, err := h.Queries.ListAllSavedSearches(context.Background())
+	searches, err := h.Queries.ListAllSavedSearches(c.Request.Context())
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -161,7 +160,7 @@ func (h *Handler) RunAlerts(c *gin.Context) {
 
 		sql, args := buildSearchQuery(req)
 
-		rows, err := h.Pool.Query(context.Background(), sql, args...)
+		rows, err := h.Pool.Query(c.Request.Context(), sql, args...)
 		if err != nil {
 			log.Printf("alerts: query failed for search %v: %v", s.ID, err)
 			continue
@@ -175,7 +174,7 @@ func (h *Handler) RunAlerts(c *gin.Context) {
 
 		// Always advance the checkpoint, even with no matches, so the window
 		// doesn't grow unbounded.
-		_ = h.Queries.TouchSavedSearch(context.Background(), s.ID)
+		_ = h.Queries.TouchSavedSearch(c.Request.Context(), s.ID)
 
 		if len(matches) == 0 || h.Email == nil {
 			continue

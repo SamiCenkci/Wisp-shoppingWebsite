@@ -1,7 +1,6 @@
 package user
 
 import (
-	"context"
 	"net/http"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
@@ -31,13 +30,13 @@ func (h *Handler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	u, err := h.Queries.GetUserByID(context.Background(), pgUUID(id))
+	u, err := h.Queries.GetUserByID(c.Request.Context(), pgUUID(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
-	listings, _ := h.Queries.ListActiveListingsByUser(context.Background(), u.ID)
+	listings, _ := h.Queries.ListActiveListingsByUser(c.Request.Context(), u.ID)
 
 	type listingWithImages struct {
 		db.Listing
@@ -45,7 +44,7 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	}
 	out := make([]listingWithImages, 0, len(listings))
 	for _, l := range listings {
-		imgs, _ := h.Queries.GetImagesByListing(context.Background(), l.ID)
+		imgs, _ := h.Queries.GetImagesByListing(c.Request.Context(), l.ID)
 		if imgs == nil {
 			imgs = []db.ListingImage{}
 		}
@@ -101,7 +100,7 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	updated, err := h.Queries.UpdateProfile(context.Background(), db.UpdateProfileParams{
+	updated, err := h.Queries.UpdateProfile(c.Request.Context(), db.UpdateProfileParams{
 		ID:            pgUUID(userID),
 		Name:          req.Name,
 		AvatarUrl:     pgText(req.AvatarURL),

@@ -35,7 +35,7 @@ type listingWithImages struct {
 // imagesFor fetches images for a batch of listings in a single query and
 // returns them grouped by listing ID. Doing this per listing was an N+1:
 // twenty cards meant twenty-one round trips.
-func (h *Handler) imagesFor(listings []db.Listing) map[string][]db.ListingImage {
+func (h *Handler) imagesFor(ctx context.Context, listings []db.Listing) map[string][]db.ListingImage {
 	grouped := map[string][]db.ListingImage{}
 	if len(listings) == 0 {
 		return grouped
@@ -46,7 +46,7 @@ func (h *Handler) imagesFor(listings []db.Listing) map[string][]db.ListingImage 
 		ids = append(ids, l.ID)
 	}
 
-	images, err := h.Queries.GetImagesByListings(context.Background(), ids)
+	images, err := h.Queries.GetImagesByListings(ctx, ids)
 	if err != nil {
 		log.Printf("images: batch fetch failed: %v", err)
 		return grouped
@@ -114,7 +114,7 @@ func (h *Handler) Create(c *gin.Context) {
 		adType = "sale"
 	}
 
-	listing, err := h.Queries.CreateListing(context.Background(), db.CreateListingParams{
+	listing, err := h.Queries.CreateListing(c.Request.Context(), db.CreateListingParams{
 		UserID:          pgUUID(userID),
 		Title:           req.Title,
 		Description:     req.Description,
@@ -138,7 +138,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	for i, url := range req.Images {
-		_, _ = h.Queries.AddListingImage(context.Background(), db.AddListingImageParams{
+		_, _ = h.Queries.AddListingImage(c.Request.Context(), db.AddListingImageParams{
 			ListingID: listing.ID,
 			Url:       url,
 			SortOrder: int32(i),
@@ -152,7 +152,7 @@ func (h *Handler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
-	listings, err := h.Queries.ListListings(context.Background(), db.ListListingsParams{
+	listings, err := h.Queries.ListListings(c.Request.Context(), db.ListListingsParams{
 		Limit:  int32(limit),
 		Offset: int32(offset),
 	})
@@ -161,7 +161,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, attach(listings, h.imagesFor(listings), h.likedSet(c)))
+	c.JSON(http.StatusOK, attach(listings, h.imagesFor(c.Request.Context(), listings), h.likedSet(c)))
 }
 
 func (h *Handler) GetOne(c *gin.Context) {
@@ -170,38 +170,38 @@ func (h *Handler) GetOne(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	listing, err := h.Queries.GetListingByID(context.Background(), pgUUID(id))
+	listing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
 	}
 
 	// Count this view (fire-and-forget; don't block on errors)
-	_ = h.Queries.IncrementViewCount(context.Background(), listing.ID)
+	_ = h.Queries.IncrementViewCount(c.Request.Context(), listing.ID)
 	listing.ViewCount = listing.ViewCount + 1
 
-	seller, _ := h.Queries.GetUserByID(context.Background(), listing.UserID)
+	seller, _ := h.Queries.GetUserByID(c.Request.Context(), listing.UserID)
 
-	similar, _ := h.Queries.GetSimilarListings(context.Background(), db.GetSimilarListingsParams{
+	similar, _ := h.Queries.GetSimilarListings(c.Request.Context(), db.GetSimilarListingsParams{
 		Category: listing.Category,
 		ID:       listing.ID,
 	})
 
 	// One query covers this listing's images and all the similar ones.
 	batch := append([]db.Listing{listing}, similar...)
-	images := h.imagesFor(batch)
+	images := h.imagesFor(c.Request.Context(), batch)
 
 	mainImages := images[uuid.UUID(listing.ID.Bytes).String()]
 	if mainImages == nil {
 		mainImages = []db.ListingImage{}
 	}
 
-	likeCount, _ := h.Queries.CountFavorites(context.Background(), listing.ID)
+	likeCount, _ := h.Queries.CountFavorites(c.Request.Context(), listing.ID)
 
 	likedByMe := false
 	if uidStr := c.GetString("userID"); uidStr != "" {
 		if uid, err := uuid.Parse(uidStr); err == nil {
-			likedByMe, _ = h.Queries.IsFavorited(context.Background(), db.IsFavoritedParams{
+			likedByMe, _ = h.Queries.IsFavorited(c.Request.Context(), db.IsFavoritedParams{
 				UserID:    pgUUID(uid),
 				ListingID: listing.ID,
 			})
@@ -238,7 +238,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.Queries.GetListingByID(context.Background(), pgUUID(id))
+	existing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
@@ -256,7 +256,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	updated, err := h.Queries.UpdateListing(context.Background(), db.UpdateListingParams{
+	updated, err := h.Queries.UpdateListing(c.Request.Context(), db.UpdateListingParams{
 		ID:              pgUUID(id),
 		Title:           req.Title,
 		Description:     req.Description,
@@ -280,6 +280,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 	// If the price dropped, tell everyone who favorited this listing.
 	// Runs in the background so the seller's save isn't held up by email.
+	// Deliberately not the request context: this outlives the response.
 	if h.Email != nil && req.PriceOre < existing.PriceOre && req.PriceOre > 0 {
 		go func(listingID uuid.UUID, title string, oldPrice, newPrice int32) {
 			favoriters, err := h.Queries.ListFavoritersForListing(context.Background(), pgUUID(listingID))
@@ -307,7 +308,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.Queries.GetListingByID(context.Background(), pgUUID(id))
+	existing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
@@ -319,7 +320,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.Queries.DeleteListing(context.Background(), pgUUID(id)); err != nil {
+	if err := h.Queries.DeleteListing(c.Request.Context(), pgUUID(id)); err != nil {
 		httpx.ServerError(c, err)
 		return
 	}
@@ -352,7 +353,7 @@ func (h *Handler) Search(c *gin.Context) {
 
 	sql, args := buildSearchQuery(req)
 
-	rows, err := h.Pool.Query(context.Background(), sql, args...)
+	rows, err := h.Pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -365,7 +366,7 @@ func (h *Handler) Search(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, attach(results, h.imagesFor(results), h.likedSet(c)))
+	c.JSON(http.StatusOK, attach(results, h.imagesFor(c.Request.Context(), results), h.likedSet(c)))
 }
 
 func (h *Handler) Mine(c *gin.Context) {
@@ -375,13 +376,13 @@ func (h *Handler) Mine(c *gin.Context) {
 		return
 	}
 
-	listings, err := h.Queries.ListListingsByUser(context.Background(), pgUUID(userID))
+	listings, err := h.Queries.ListListingsByUser(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, attach(listings, h.imagesFor(listings), nil))
+	c.JSON(http.StatusOK, attach(listings, h.imagesFor(c.Request.Context(), listings), nil))
 }
 
 type statusRequest struct {
@@ -395,7 +396,7 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.Queries.GetListingByID(context.Background(), pgUUID(id))
+	existing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
@@ -413,7 +414,7 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.Queries.UpdateListingStatus(context.Background(), db.UpdateListingStatusParams{
+	if err := h.Queries.UpdateListingStatus(c.Request.Context(), db.UpdateListingStatusParams{
 		ID:     pgUUID(id),
 		Status: req.Status,
 	}); err != nil {
@@ -460,7 +461,7 @@ func (h *Handler) likedSet(c *gin.Context) map[string]bool {
 	if err != nil {
 		return set
 	}
-	ids, err := h.Queries.ListFavoriteIDsByUser(context.Background(), pgUUID(uid))
+	ids, err := h.Queries.ListFavoriteIDsByUser(c.Request.Context(), pgUUID(uid))
 	if err != nil {
 		return set
 	}

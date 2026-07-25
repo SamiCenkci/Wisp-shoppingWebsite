@@ -1,7 +1,6 @@
 package listing
 
 import (
-	"context"
 	"log"
 	"net/http"
 
@@ -29,7 +28,7 @@ func (h *Handler) MarkSold(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.Queries.GetListingByID(context.Background(), pgUUID(listingID))
+	existing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(listingID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
@@ -54,7 +53,7 @@ func (h *Handler) MarkSold(c *gin.Context) {
 		return
 	}
 
-	if err := h.Queries.MarkListingSold(context.Background(), db.MarkListingSoldParams{
+	if err := h.Queries.MarkListingSold(c.Request.Context(), db.MarkListingSoldParams{
 		ID:     pgUUID(listingID),
 		SoldTo: pgUUID(buyerID),
 	}); err != nil {
@@ -66,11 +65,11 @@ func (h *Handler) MarkSold(c *gin.Context) {
 	if h.Email == nil {
 		log.Println("email: mailer not configured")
 	} else {
-		buyer, err := h.Queries.GetUserByID(context.Background(), pgUUID(buyerID))
+		buyer, err := h.Queries.GetUserByID(c.Request.Context(), pgUUID(buyerID))
 		if err != nil {
 			log.Printf("email: could not load buyer: %v", err)
 		} else {
-			seller, _ := h.Queries.GetUserByID(context.Background(), existing.UserID)
+			seller, _ := h.Queries.GetUserByID(c.Request.Context(), existing.UserID)
 			sellerName := seller.Name
 			if seller.DisplayName != "" {
 				sellerName = seller.DisplayName
@@ -114,13 +113,13 @@ func (h *Handler) CreateReview(c *gin.Context) {
 		return
 	}
 
-	listing, err := h.Queries.GetListingByID(context.Background(), pgUUID(listingID))
+	listing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(listingID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "annonse ikke funnet"})
 		return
 	}
 
-	already, _ := h.Queries.HasReviewed(context.Background(), db.HasReviewedParams{
+	already, _ := h.Queries.HasReviewed(c.Request.Context(), db.HasReviewedParams{
 		ListingID:  pgUUID(listingID),
 		ReviewerID: pgUUID(reviewerID),
 	})
@@ -142,7 +141,7 @@ func (h *Handler) CreateReview(c *gin.Context) {
 		return
 	}
 
-	review, err := h.Queries.CreateReview(context.Background(), db.CreateReviewParams{
+	review, err := h.Queries.CreateReview(c.Request.Context(), db.CreateReviewParams{
 		ListingID:      pgUUID(listingID),
 		ReviewerID:     pgUUID(reviewerID),
 		ReviewedUserID: pgUUID(reviewedID),
@@ -167,7 +166,7 @@ func (h *Handler) UserReviews(c *gin.Context) {
 		return
 	}
 
-	reviews, err := h.Queries.ListReviewsForUser(context.Background(), pgUUID(userID))
+	reviews, err := h.Queries.ListReviewsForUser(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -176,7 +175,7 @@ func (h *Handler) UserReviews(c *gin.Context) {
 		reviews = []db.ListReviewsForUserRow{}
 	}
 
-	summary, err := h.Queries.GetUserRatingSummary(context.Background(), pgUUID(userID))
+	summary, err := h.Queries.GetUserRatingSummary(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -202,7 +201,7 @@ func (h *Handler) ListingBuyers(c *gin.Context) {
 		return
 	}
 
-	listing, err := h.Queries.GetListingByID(context.Background(), pgUUID(listingID))
+	listing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(listingID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "annonse ikke funnet"})
 		return
@@ -212,7 +211,7 @@ func (h *Handler) ListingBuyers(c *gin.Context) {
 		return
 	}
 
-	buyers, err := h.Queries.ListBuyersForListing(context.Background(), pgUUID(listingID))
+	buyers, err := h.Queries.ListBuyersForListing(c.Request.Context(), pgUUID(listingID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -238,7 +237,7 @@ func (h *Handler) DeleteReview(c *gin.Context) {
 	}
 
 	// The query itself only deletes when reviewer_id matches, so this is safe.
-	if err := h.Queries.DeleteReview(context.Background(), db.DeleteReviewParams{
+	if err := h.Queries.DeleteReview(c.Request.Context(), db.DeleteReviewParams{
 		ID:         pgUUID(reviewID),
 		ReviewerID: pgUUID(userID),
 	}); err != nil {
@@ -272,7 +271,7 @@ func (h *Handler) ReplyToReview(c *gin.Context) {
 		return
 	}
 
-	review, err := h.Queries.GetReviewByID(context.Background(), pgUUID(reviewID))
+	review, err := h.Queries.GetReviewByID(c.Request.Context(), pgUUID(reviewID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "vurdering ikke funnet"})
 		return
@@ -286,7 +285,7 @@ func (h *Handler) ReplyToReview(c *gin.Context) {
 		return
 	}
 
-	if err := h.Queries.ReplyToReview(context.Background(), db.ReplyToReviewParams{
+	if err := h.Queries.ReplyToReview(c.Request.Context(), db.ReplyToReviewParams{
 		ID:             pgUUID(reviewID),
 		ReviewedUserID: pgUUID(userID),
 		Reply:          req.Reply,
@@ -306,7 +305,7 @@ func (h *Handler) MyGivenReviews(c *gin.Context) {
 		return
 	}
 
-	reviews, err := h.Queries.ListReviewsByReviewer(context.Background(), pgUUID(userID))
+	reviews, err := h.Queries.ListReviewsByReviewer(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -331,7 +330,7 @@ func (h *Handler) CanReview(c *gin.Context) {
 		return
 	}
 
-	listing, err := h.Queries.GetListingByID(context.Background(), pgUUID(listingID))
+	listing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(listingID))
 	if err != nil || listing.Status != "sold" || !listing.SoldTo.Valid {
 		c.JSON(http.StatusOK, gin.H{"can_review": false})
 		return
@@ -344,7 +343,7 @@ func (h *Handler) CanReview(c *gin.Context) {
 		return
 	}
 
-	already, _ := h.Queries.HasReviewed(context.Background(), db.HasReviewedParams{
+	already, _ := h.Queries.HasReviewed(c.Request.Context(), db.HasReviewedParams{
 		ListingID:  pgUUID(listingID),
 		ReviewerID: pgUUID(userID),
 	})

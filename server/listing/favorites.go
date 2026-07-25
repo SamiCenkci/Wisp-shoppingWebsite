@@ -1,7 +1,6 @@
 package listing
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +23,7 @@ func (h *Handler) AddFavorite(c *gin.Context) {
 		return
 	}
 
-	err = h.Queries.AddFavorite(context.Background(), db.AddFavoriteParams{
+	err = h.Queries.AddFavorite(c.Request.Context(), db.AddFavoriteParams{
 		UserID:    pgUUID(userID),
 		ListingID: pgUUID(listingID),
 	})
@@ -48,7 +47,7 @@ func (h *Handler) RemoveFavorite(c *gin.Context) {
 		return
 	}
 
-	err = h.Queries.RemoveFavorite(context.Background(), db.RemoveFavoriteParams{
+	err = h.Queries.RemoveFavorite(c.Request.Context(), db.RemoveFavoriteParams{
 		UserID:    pgUUID(userID),
 		ListingID: pgUUID(listingID),
 	})
@@ -78,12 +77,12 @@ func (h *Handler) MyFavorites(c *gin.Context) {
 		return
 	}
 
-	listings, err := h.Queries.ListFavoriteListingsByUser(context.Background(), pgUUID(authID))
+	listings, err := h.Queries.ListFavoriteListingsByUser(c.Request.Context(), pgUUID(authID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
 	}
 
 	// Everything here is favorited by definition, so pass a nil liked set.
-	c.JSON(http.StatusOK, attach(listings, h.imagesFor(listings), nil))
+	c.JSON(http.StatusOK, attach(listings, h.imagesFor(c.Request.Context(), listings), nil))
 }

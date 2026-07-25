@@ -1,7 +1,6 @@
 package upload
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -89,7 +88,7 @@ func (h *Handler) Presign(c *gin.Context) {
 		return
 	}
 
-	cfg, err := awscfg.LoadDefaultConfig(context.Background(),
+	cfg, err := awscfg.LoadDefaultConfig(c.Request.Context(),
 		awscfg.WithRegion(h.Region),
 		awscfg.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(h.AccessKey, h.SecretKey, ""),
@@ -105,7 +104,7 @@ func (h *Handler) Presign(c *gin.Context) {
 
 	key := fmt.Sprintf("listings/%s-%s", uuid.New().String(), safeFileName(req.FileName))
 
-	presigned, err := presigner.PresignPutObject(context.Background(), &s3.PutObjectInput{
+	presigned, err := presigner.PresignPutObject(c.Request.Context(), &s3.PutObjectInput{
 		Bucket:      aws.String(h.Bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(req.ContentType),

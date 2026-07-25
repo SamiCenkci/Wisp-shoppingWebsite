@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -57,7 +56,7 @@ func (h *Handler) Start(c *gin.Context) {
 		return
 	}
 
-	conv, err := h.Queries.GetOrCreateConversation(context.Background(), db.GetOrCreateConversationParams{
+	conv, err := h.Queries.GetOrCreateConversation(c.Request.Context(), db.GetOrCreateConversationParams{
 		ListingID: pgUUID(listingID),
 		BuyerID:   pgUUID(buyerID),
 		SellerID:  pgUUID(sellerID),
@@ -79,7 +78,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	convs, err := h.Queries.ListConversationsForUser(context.Background(), pgUUID(userID))
+	convs, err := h.Queries.ListConversationsForUser(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -103,22 +102,22 @@ func (h *Handler) List(c *gin.Context) {
 		if conv.SellerID.Bytes == [16]byte(userID) {
 			otherID = conv.BuyerID
 		}
-		if other, err := h.Queries.GetUserByID(context.Background(), otherID); err == nil {
+		if other, err := h.Queries.GetUserByID(c.Request.Context(), otherID); err == nil {
 			e.OtherName = other.Name
 			if other.DisplayName != "" {
 				e.OtherName = other.DisplayName
 			}
 		}
 
-		if listing, err := h.Queries.GetListingByID(context.Background(), conv.ListingID); err == nil {
+		if listing, err := h.Queries.GetListingByID(c.Request.Context(), conv.ListingID); err == nil {
 			e.ListingTitle = listing.Title
 			e.ListingDeleted = listing.DeletedAt.Valid
-			if imgs, err := h.Queries.GetImagesByListing(context.Background(), conv.ListingID); err == nil && len(imgs) > 0 {
+			if imgs, err := h.Queries.GetImagesByListing(c.Request.Context(), conv.ListingID); err == nil && len(imgs) > 0 {
 				e.ListingImage = imgs[0].Url
 			}
 		}
 
-		if msgs, err := h.Queries.ListMessages(context.Background(), conv.ID); err == nil && len(msgs) > 0 {
+		if msgs, err := h.Queries.ListMessages(c.Request.Context(), conv.ID); err == nil && len(msgs) > 0 {
 			last := msgs[len(msgs)-1]
 			if last.Content != "" {
 				e.LastMessage = last.Content
@@ -127,7 +126,7 @@ func (h *Handler) List(c *gin.Context) {
 			}
 		}
 
-		if cnt, err := h.Queries.CountUnreadInConversation(context.Background(), db.CountUnreadInConversationParams{
+		if cnt, err := h.Queries.CountUnreadInConversation(c.Request.Context(), db.CountUnreadInConversationParams{
 			ConversationID: conv.ID,
 			SenderID:       pgUUID(userID),
 		}); err == nil {
@@ -149,7 +148,7 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 		return
 	}
 
-	count, err := h.Queries.CountUnreadForUser(context.Background(), pgUUID(userID))
+	count, err := h.Queries.CountUnreadForUser(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -173,7 +172,7 @@ func (h *Handler) Messages(c *gin.Context) {
 		return
 	}
 
-	conv, err := h.Queries.GetConversationByID(context.Background(), pgUUID(convID))
+	conv, err := h.Queries.GetConversationByID(c.Request.Context(), pgUUID(convID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 		return
@@ -183,13 +182,13 @@ func (h *Handler) Messages(c *gin.Context) {
 		return
 	}
 
-	msgs, err := h.Queries.ListMessages(context.Background(), pgUUID(convID))
+	msgs, err := h.Queries.ListMessages(c.Request.Context(), pgUUID(convID))
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
 	}
 
-	_ = h.Queries.MarkMessagesRead(context.Background(), db.MarkMessagesReadParams{
+	_ = h.Queries.MarkMessagesRead(c.Request.Context(), db.MarkMessagesReadParams{
 		ConversationID: pgUUID(convID),
 		SenderID:       pgUUID(userID),
 	})
@@ -217,7 +216,7 @@ func (h *Handler) Send(c *gin.Context) {
 		return
 	}
 
-	conv, err := h.Queries.GetConversationByID(context.Background(), pgUUID(convID))
+	conv, err := h.Queries.GetConversationByID(c.Request.Context(), pgUUID(convID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 		return
@@ -239,7 +238,7 @@ func (h *Handler) Send(c *gin.Context) {
 		return
 	}
 
-	msg, err := h.Queries.CreateMessage(context.Background(), db.CreateMessageParams{
+	msg, err := h.Queries.CreateMessage(c.Request.Context(), db.CreateMessageParams{
 		ConversationID: pgUUID(convID),
 		SenderID:       pgUUID(userID),
 		Content:        req.Content,
@@ -251,7 +250,7 @@ func (h *Handler) Send(c *gin.Context) {
 		return
 	}
 
-	_ = h.Queries.TouchConversation(context.Background(), pgUUID(convID))
+	_ = h.Queries.TouchConversation(c.Request.Context(), pgUUID(convID))
 
 	var recipientID string
 	if conv.BuyerID.Bytes == [16]byte(userID) {

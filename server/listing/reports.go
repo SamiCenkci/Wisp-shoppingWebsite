@@ -1,7 +1,6 @@
 package listing
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -50,7 +49,7 @@ func (h *Handler) ReportListing(c *gin.Context) {
 		return
 	}
 
-	listing, err := h.Queries.GetListingByID(context.Background(), pgUUID(listingID))
+	listing, err := h.Queries.GetListingByID(c.Request.Context(), pgUUID(listingID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "annonse ikke funnet"})
 		return
@@ -62,7 +61,7 @@ func (h *Handler) ReportListing(c *gin.Context) {
 		return
 	}
 
-	already, _ := h.Queries.HasReported(context.Background(), db.HasReportedParams{
+	already, _ := h.Queries.HasReported(c.Request.Context(), db.HasReportedParams{
 		ListingID:  pgUUID(listingID),
 		ReporterID: pgUUID(reporterID),
 	})
@@ -71,7 +70,7 @@ func (h *Handler) ReportListing(c *gin.Context) {
 		return
 	}
 
-	if _, err := h.Queries.CreateReport(context.Background(), db.CreateReportParams{
+	if _, err := h.Queries.CreateReport(c.Request.Context(), db.CreateReportParams{
 		ListingID:  pgUUID(listingID),
 		ReporterID: pgUUID(reporterID),
 		Reason:     req.Reason,
@@ -91,7 +90,7 @@ func (h *Handler) requireAdmin(c *gin.Context) bool {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
 		return false
 	}
-	user, err := h.Queries.GetUserByID(context.Background(), pgUUID(userID))
+	user, err := h.Queries.GetUserByID(c.Request.Context(), pgUUID(userID))
 	if err != nil || !user.IsAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "ikke tilgang"})
 		return false
@@ -105,7 +104,7 @@ func (h *Handler) ListReports(c *gin.Context) {
 		return
 	}
 
-	reports, err := h.Queries.ListReports(context.Background())
+	reports, err := h.Queries.ListReports(c.Request.Context())
 	if err != nil {
 		httpx.ServerError(c, err)
 		return
@@ -114,7 +113,7 @@ func (h *Handler) ListReports(c *gin.Context) {
 		reports = []db.ListReportsRow{}
 	}
 
-	open, _ := h.Queries.CountOpenReports(context.Background())
+	open, _ := h.Queries.CountOpenReports(c.Request.Context())
 
 	c.JSON(http.StatusOK, gin.H{"reports": reports, "open_count": open})
 }
@@ -145,7 +144,7 @@ func (h *Handler) UpdateReportStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.Queries.UpdateReportStatus(context.Background(), db.UpdateReportStatusParams{
+	if err := h.Queries.UpdateReportStatus(c.Request.Context(), db.UpdateReportStatusParams{
 		ID:     pgUUID(reportID),
 		Status: req.Status,
 	}); err != nil {
@@ -169,7 +168,7 @@ func (h *Handler) AdminDeleteListing(c *gin.Context) {
 	}
 
 	// Soft delete, same as the owner's own delete — conversations and reviews survive.
-	if err := h.Queries.DeleteListing(context.Background(), pgUUID(listingID)); err != nil {
+	if err := h.Queries.DeleteListing(c.Request.Context(), pgUUID(listingID)); err != nil {
 		httpx.ServerError(c, err)
 		return
 	}

@@ -29,7 +29,7 @@ func newToken() (string, error) {
 
 // IssueVerification creates a token and emails the link. Errors are logged
 // rather than returned — a failed email shouldn't fail the signup itself.
-func (h *Handler) IssueVerification(userID uuid.UUID, email, name string) {
+func (h *Handler) IssueVerification(ctx context.Context, userID uuid.UUID, email, name string) {
 	if h.Email == nil {
 		log.Println("verification: mailer not configured")
 		return
@@ -42,9 +42,9 @@ func (h *Handler) IssueVerification(userID uuid.UUID, email, name string) {
 	}
 
 	// Invalidate any earlier links for this user.
-	_ = h.Queries.DeleteVerificationTokensForUser(context.Background(), pgUUID(userID))
+	_ = h.Queries.DeleteVerificationTokensForUser(ctx, pgUUID(userID))
 
-	err = h.Queries.CreateVerificationToken(context.Background(), db.CreateVerificationTokenParams{
+	err = h.Queries.CreateVerificationToken(ctx, db.CreateVerificationTokenParams{
 		Token:     token,
 		UserID:    pgUUID(userID),
 		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(verificationValidFor), Valid: true},
@@ -65,7 +65,7 @@ func (h *Handler) Verify(c *gin.Context) {
 		return
 	}
 
-	row, err := h.Queries.GetVerificationToken(context.Background(), token)
+	row, err := h.Queries.GetVerificationToken(c.Request.Context(), token)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ugyldig eller brukt lenke"})
 		return
@@ -76,13 +76,13 @@ func (h *Handler) Verify(c *gin.Context) {
 		return
 	}
 
-	if err := h.Queries.MarkUserVerified(context.Background(), row.UserID); err != nil {
+	if err := h.Queries.MarkUserVerified(c.Request.Context(), row.UserID); err != nil {
 		httpx.ServerError(c, err)
 		return
 	}
 
 	// Single use.
-	_ = h.Queries.DeleteVerificationTokensForUser(context.Background(), row.UserID)
+	_ = h.Queries.DeleteVerificationTokensForUser(c.Request.Context(), row.UserID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "e-postadressen er bekreftet"})
 }
@@ -95,7 +95,7 @@ func (h *Handler) ResendVerification(c *gin.Context) {
 		return
 	}
 
-	user, err := h.Queries.GetUserByID(context.Background(), pgUUID(userID))
+	user, err := h.Queries.GetUserByID(c.Request.Context(), pgUUID(userID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "bruker ikke funnet"})
 		return
@@ -110,7 +110,7 @@ func (h *Handler) ResendVerification(c *gin.Context) {
 	if user.DisplayName != "" {
 		name = user.DisplayName
 	}
-	h.IssueVerification(userID, user.Email, name)
+	h.IssueVerification(c.Request.Context(), userID, user.Email, name)
 
 	c.JSON(http.StatusOK, gin.H{"message": "ny lenke sendt"})
 }
@@ -125,7 +125,7 @@ func RequireVerified(queries *db.Queries) gin.HandlerFunc {
 			return
 		}
 
-		user, err := queries.GetUserByID(context.Background(), pgUUID(userID))
+		user, err := queries.GetUserByID(c.Request.Context(), pgUUID(userID))
 		if err != nil || !user.VerifiedAt.Valid {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": "Bekreft e-postadressen din for å gjøre dette.",
