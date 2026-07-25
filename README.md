@@ -14,6 +14,7 @@ A few things it does that go beyond CRUD:
 - **Norwegian address autocomplete.** Integrates [Kartverket](https://ws.geonorge.no/adresser/v1/) (the national mapping authority) for address lookup, which fills postal code and place automatically and captures coordinates. The listing map shows an approximate area rather than an exact pin, since a seller's address is usually their home.
 - **Mutual reviews with real constraints.** Only the two parties in a completed sale can review each other, once each, and only after the seller records who they sold to. The authorisation rules live in a pure function with test coverage.
 - **Saved searches with alerts.** Users save a filter set and get emailed when matching listings appear. Render's free tier has no cron, so an external scheduler calls a secret-guarded endpoint — which also wakes the sleeping instance.
+- **Bilingual UI without touching the data.** The whole interface switches between Norwegian and English. Category names, attribute values and conditions are canonical identifiers in the database, so they stay Norwegian in the data and API — a display-layer map translates them on screen, meaning existing listings and the API contract never change.
 > The live site is seeded with demo listings from a `Wisp Demo` account so the marketplace isn't empty. They behave like real listings but nobody is on the other end of them.
  
 ---
@@ -22,7 +23,7 @@ A few things it does that go beyond CRUD:
  
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | Next.js 16 (App Router), TypeScript, Tailwind CSS v4 — deployed on **Vercel** |
+| **Frontend** | Next.js 16 (App Router), TypeScript, Tailwind CSS v4, custom i18n (Norwegian/English) — deployed on **Vercel** |
 | **Backend** | Go, Gin, JWT (HS256), bcrypt, Gorilla WebSocket — deployed on **Render** (Frankfurt) |
 | **Database** | **Neon** managed PostgreSQL, SQLC for type-safe queries, pgx/v5, `pg_trgm` for fuzzy search, JSONB + GIN for attributes |
 | **Storage** | AWS S3 via presigned uploads, with browser-side image compression |
@@ -61,11 +62,15 @@ A few things it does that go beyond CRUD:
 - Reviewed users can reply once; reviewers can delete what they wrote
 ### Trust & Safety
 - Report listings with a reason and optional detail
-- Admin moderation view to dismiss, action, or remove reported listings
+- Admin moderation view to dismiss, action, or remove reported listings — admin status rides in the JWT claims, checked without a per-request lookup
 - Upload content-type allowlist and filename sanitisation
 - Server-side length validation and fully parameterised search queries
+- Internal errors are logged server-side and never echoed to clients
+- Rate limiting keys on the proxy-verified client IP, so `X-Forwarded-For` spoofing can't dodge it
+- JWT parsing pins the signing algorithm to HS256
 ### Design
 - Responsive layout with light and dark mode
+- Norwegian and English interface — persistent 🌐 toggle, FAQ chatbot answers in both languages
 - FAQ chatbot with persistent history
 - About, Help and Privacy pages
 ---
