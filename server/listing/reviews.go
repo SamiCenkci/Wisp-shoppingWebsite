@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 )
 
 type soldRequest struct {
@@ -57,7 +58,7 @@ func (h *Handler) MarkSold(c *gin.Context) {
 		ID:     pgUUID(listingID),
 		SoldTo: pgUUID(buyerID),
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -151,7 +152,7 @@ func (h *Handler) CreateReview(c *gin.Context) {
 		Comment:        req.Comment,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -168,7 +169,7 @@ func (h *Handler) UserReviews(c *gin.Context) {
 
 	reviews, err := h.Queries.ListReviewsForUser(context.Background(), pgUUID(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	if reviews == nil {
@@ -177,7 +178,7 @@ func (h *Handler) UserReviews(c *gin.Context) {
 
 	summary, err := h.Queries.GetUserRatingSummary(context.Background(), pgUUID(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -213,7 +214,7 @@ func (h *Handler) ListingBuyers(c *gin.Context) {
 
 	buyers, err := h.Queries.ListBuyersForListing(context.Background(), pgUUID(listingID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	if buyers == nil {
@@ -241,7 +242,7 @@ func (h *Handler) DeleteReview(c *gin.Context) {
 		ID:         pgUUID(reviewID),
 		ReviewerID: pgUUID(userID),
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -290,7 +291,7 @@ func (h *Handler) ReplyToReview(c *gin.Context) {
 		ReviewedUserID: pgUUID(userID),
 		Reply:          req.Reply,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -307,7 +308,7 @@ func (h *Handler) MyGivenReviews(c *gin.Context) {
 
 	reviews, err := h.Queries.ListReviewsByReviewer(context.Background(), pgUUID(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	if reviews == nil {

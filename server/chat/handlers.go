@@ -6,6 +6,7 @@ import (
 	"time"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -62,7 +63,7 @@ func (h *Handler) Start(c *gin.Context) {
 		SellerID:  pgUUID(sellerID),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -80,7 +81,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	convs, err := h.Queries.ListConversationsForUser(context.Background(), pgUUID(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -150,7 +151,7 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 
 	count, err := h.Queries.CountUnreadForUser(context.Background(), pgUUID(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -184,7 +185,7 @@ func (h *Handler) Messages(c *gin.Context) {
 
 	msgs, err := h.Queries.ListMessages(context.Background(), pgUUID(convID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -246,7 +247,7 @@ func (h *Handler) Send(c *gin.Context) {
 		AttachmentName: req.AttachmentName,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 

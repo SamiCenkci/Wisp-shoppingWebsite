@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 )
 
 // POST /api/listings/:id/favorite
@@ -28,7 +29,7 @@ func (h *Handler) AddFavorite(c *gin.Context) {
 		ListingID: pgUUID(listingID),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"liked": true})
@@ -52,7 +53,7 @@ func (h *Handler) RemoveFavorite(c *gin.Context) {
 		ListingID: pgUUID(listingID),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"liked": false})
@@ -79,7 +80,7 @@ func (h *Handler) MyFavorites(c *gin.Context) {
 
 	listings, err := h.Queries.ListFavoriteListingsByUser(context.Background(), pgUUID(authID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 

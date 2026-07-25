@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -115,7 +116,7 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 		Country:       req.Country,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 

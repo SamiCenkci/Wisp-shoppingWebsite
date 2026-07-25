@@ -12,6 +12,7 @@ import (
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
 	"github.com/SamiCenkci/Shopping-Website/email"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 )
 
 type savedSearchRequest struct {
@@ -57,7 +58,7 @@ func (h *Handler) CreateSavedSearch(c *gin.Context) {
 		MaxPrice:        req.MaxPrice,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -74,7 +75,7 @@ func (h *Handler) ListSavedSearches(c *gin.Context) {
 
 	searches, err := h.Queries.ListSavedSearchesByUser(context.Background(), pgUUID(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -115,7 +116,7 @@ func (h *Handler) DeleteSavedSearch(c *gin.Context) {
 		ID:     pgUUID(searchID),
 		UserID: pgUUID(userID),
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -134,7 +135,7 @@ func (h *Handler) RunAlerts(c *gin.Context) {
 
 	searches, err := h.Queries.ListAllSavedSearches(context.Background())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 

@@ -12,6 +12,7 @@ import (
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -110,7 +111,7 @@ func (h *Handler) Presign(c *gin.Context) {
 		ContentType: aws.String(req.ContentType),
 	}, s3.WithPresignExpires(5*time.Minute))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 

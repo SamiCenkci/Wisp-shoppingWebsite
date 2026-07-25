@@ -10,6 +10,7 @@ import (
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
 	"github.com/SamiCenkci/Shopping-Website/email"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -132,7 +133,7 @@ func (h *Handler) Create(c *gin.Context) {
 		Attributes:      attrsJSON(req.Attributes),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -156,7 +157,7 @@ func (h *Handler) List(c *gin.Context) {
 		Offset: int32(offset),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -273,7 +274,7 @@ func (h *Handler) Update(c *gin.Context) {
 		Attributes:      attrsJSON(req.Attributes),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -319,7 +320,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 
 	if err := h.Queries.DeleteListing(context.Background(), pgUUID(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "listing deleted"})
@@ -353,14 +354,14 @@ func (h *Handler) Search(c *gin.Context) {
 
 	rows, err := h.Pool.Query(context.Background(), sql, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	defer rows.Close()
 
 	results, err := pgx.CollectRows(rows, pgx.RowToStructByName[db.Listing])
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -376,7 +377,7 @@ func (h *Handler) Mine(c *gin.Context) {
 
 	listings, err := h.Queries.ListListingsByUser(context.Background(), pgUUID(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -416,7 +417,7 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		ID:     pgUUID(id),
 		Status: req.Status,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "status oppdatert"})

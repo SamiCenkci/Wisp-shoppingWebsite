@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 )
 
 const verificationValidFor = 24 * time.Hour
@@ -76,7 +77,7 @@ func (h *Handler) Verify(c *gin.Context) {
 	}
 
 	if err := h.Queries.MarkUserVerified(context.Background(), row.UserID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 

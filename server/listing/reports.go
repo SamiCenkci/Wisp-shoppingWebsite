@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	db "github.com/SamiCenkci/Shopping-Website/db/generated"
+	"github.com/SamiCenkci/Shopping-Website/httpx"
 )
 
 // Reasons the frontend offers. Anything else is rejected, so the moderation
@@ -76,7 +77,7 @@ func (h *Handler) ReportListing(c *gin.Context) {
 		Reason:     req.Reason,
 		Details:    req.Details,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -106,7 +107,7 @@ func (h *Handler) ListReports(c *gin.Context) {
 
 	reports, err := h.Queries.ListReports(context.Background())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 	if reports == nil {
@@ -148,7 +149,7 @@ func (h *Handler) UpdateReportStatus(c *gin.Context) {
 		ID:     pgUUID(reportID),
 		Status: req.Status,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
@@ -169,7 +170,7 @@ func (h *Handler) AdminDeleteListing(c *gin.Context) {
 
 	// Soft delete, same as the owner's own delete — conversations and reviews survive.
 	if err := h.Queries.DeleteListing(context.Background(), pgUUID(listingID)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpx.ServerError(c, err)
 		return
 	}
 
