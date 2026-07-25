@@ -19,6 +19,7 @@ type Config struct {
 	AllowedOrigins     []string
 	ResendAPIKey       string
 	AlertSecret        string
+	OnRender           bool
 }
 
 func Load() *Config {
@@ -57,6 +58,7 @@ func Load() *Config {
 		AllowedOrigins:     originList,
 		ResendAPIKey:       os.Getenv("RESEND_API_KEY"),
 		AlertSecret:        os.Getenv("ALERT_SECRET"),
+		OnRender:           os.Getenv("RENDER") == "true", // set automatically by Render
 	}
 	if cfg.DatabaseURL == "" {
 		log.Fatal("DATABASE_URL is not set in .env")

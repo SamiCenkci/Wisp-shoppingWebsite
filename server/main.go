@@ -60,8 +60,14 @@ func main() {
 
 	router := gin.Default()
 
-	// Render terminates TLS at its proxy, so trust the forwarded client IP.
-	_ = router.SetTrustedProxies([]string{"0.0.0.0/0"})
+	// Never trust X-Forwarded-For blindly: anyone can send that header, which
+	// would let clients pick their own IP and dodge the per-IP rate limits.
+	_ = router.SetTrustedProxies(nil)
+	if cfg.OnRender {
+		// On Render all traffic comes through their edge (Cloudflare), which
+		// overwrites True-Client-IP with the real client address.
+		router.TrustedPlatform = "True-Client-IP"
+	}
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowedOrigins,
