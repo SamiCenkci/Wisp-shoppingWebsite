@@ -26,14 +26,15 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		userID, err := ParseToken(parts[1], jwtSecret)
+		claims, err := ParseToken(parts[1], jwtSecret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			c.Abort()
 			return
 		}
 
-		c.Set("userID", userID)
+		c.Set("userID", claims.UserID)
+		c.Set("isAdmin", claims.IsAdmin)
 		c.Next()
 	}
 }
@@ -59,14 +60,15 @@ func RequireAuthWS(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		userID, err := ParseToken(tokenStr, jwtSecret)
+		claims, err := ParseToken(tokenStr, jwtSecret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			c.Abort()
 			return
 		}
 
-		c.Set("userID", userID)
+		c.Set("userID", claims.UserID)
+		c.Set("isAdmin", claims.IsAdmin)
 		c.Next()
 	}
 }
@@ -79,8 +81,9 @@ func OptionalAuth(jwtSecret string) gin.HandlerFunc {
 		header := c.GetHeader("Authorization")
 		parts := strings.SplitN(header, " ", 2)
 		if len(parts) == 2 && parts[0] == "Bearer" {
-			if userID, err := ParseToken(parts[1], jwtSecret); err == nil {
-				c.Set("userID", userID)
+			if claims, err := ParseToken(parts[1], jwtSecret); err == nil {
+				c.Set("userID", claims.UserID)
+				c.Set("isAdmin", claims.IsAdmin)
 			}
 		}
 		c.Next()

@@ -84,14 +84,9 @@ func (h *Handler) ReportListing(c *gin.Context) {
 }
 
 // requireAdmin reports whether the caller is an admin, writing the error if not.
+// Admin status comes from the JWT claim set at login, so no user lookup is needed.
 func (h *Handler) requireAdmin(c *gin.Context) bool {
-	userID, err := uuid.Parse(c.GetString("userID"))
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
-		return false
-	}
-	user, err := h.Queries.GetUserByID(c.Request.Context(), pgUUID(userID))
-	if err != nil || !user.IsAdmin {
+	if !c.GetBool("isAdmin") {
 		c.JSON(http.StatusForbidden, gin.H{"error": "ikke tilgang"})
 		return false
 	}
