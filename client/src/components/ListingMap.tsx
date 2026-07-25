@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 type Props = {
   latitude: number;
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export default function ListingMap({ latitude, longitude, label }: Props) {
+  const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<unknown>(null);
 
@@ -41,7 +43,7 @@ export default function ListingMap({ latitude, longitude, label }: Props) {
         weight: 2,
       })
         .addTo(map)
-        .bindPopup(label || "Omtrentlig område");
+        .bindPopup(label || t("listing.approximateArea"));
     }
 
     init();
@@ -52,6 +54,7 @@ export default function ListingMap({ latitude, longitude, label }: Props) {
       if (map?.remove) map.remove();
       mapRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latitude, longitude, label]);
 
   return <div ref={containerRef} className="w-full h-64 rounded-2xl overflow-hidden border border-line z-0" />;

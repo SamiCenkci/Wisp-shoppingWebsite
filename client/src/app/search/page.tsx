@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 
 type Image = { id: string; url: string };
 type Listing = {
@@ -17,6 +18,7 @@ type Listing = {
 };
 
 export default function SearchPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [filters, setFilters] = useState({
     query: "",
@@ -87,12 +89,12 @@ export default function SearchPage() {
 
   return (
     <main className="max-w-[1400px] mx-auto px-[5%] py-10">
-      <h1 className="text-2xl font-semibold mb-6 text-ink">Søk i annonser</h1>
+      <h1 className="text-2xl font-semibold mb-6 text-ink">{t("home.searchListings")}</h1>
 
       <form onSubmit={handleSearch} className="mb-4">
         <div className="flex gap-2">
           <input
-            placeholder="Hva leter du etter?"
+            placeholder={t("home.searchQueryPlaceholder")}
             value={filters.query}
             onChange={(e) => update("query", e.target.value)}
             className="flex-1 px-5 py-3 rounded-full border border-line bg-surface text-ink outline-none focus:border-brand"
@@ -102,7 +104,7 @@ export default function SearchPage() {
             onClick={() => setShowFilters((s) => !s)}
             className="px-5 py-3 rounded-full border border-line bg-surface text-ink-secondary font-medium hover:border-brand hover:text-brand flex items-center gap-2"
           >
-            Filter
+            {t("home.filter")}
             {count > 0 && (
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-xs">
                 {count}
@@ -115,7 +117,7 @@ export default function SearchPage() {
             disabled={loading}
             className="px-6 py-3 rounded-full bg-brand text-white font-medium hover:bg-brand-dark disabled:opacity-50"
           >
-            {loading ? "Søker..." : "Søk"}
+            {loading ? t("home.searching") : t("nav.search")}
           </button>
         </div>
 
@@ -123,37 +125,37 @@ export default function SearchPage() {
           <div className="mt-3 bg-surface border border-line rounded-2xl p-5 shadow-sm">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-ink mb-1">Kategori</label>
+                <label className="block text-sm font-medium text-ink mb-1">{t("home.category")}</label>
                 <input
-                  placeholder="f.eks. møbler"
+                  placeholder={t("home.categoryPlaceholder")}
                   value={filters.category}
                   onChange={(e) => update("category", e.target.value)}
                   className={inputClass}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink mb-1">Fylke</label>
+                <label className="block text-sm font-medium text-ink mb-1">{t("home.county")}</label>
                 <input
-                  placeholder="f.eks. Oslo"
+                  placeholder={t("home.countyPlaceholder")}
                   value={filters.county}
                   onChange={(e) => update("county", e.target.value)}
                   className={inputClass}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink mb-1">Sortering</label>
+                <label className="block text-sm font-medium text-ink mb-1">{t("home.sorting")}</label>
                 <select
                   value={filters.sort_by}
                   onChange={(e) => update("sort_by", e.target.value)}
                   className={inputClass}
                 >
-                  <option value="newest">Nyeste først</option>
-                  <option value="price_asc">Pris: lav til høy</option>
-                  <option value="price_desc">Pris: høy til lav</option>
+                  <option value="newest">{t("home.sortNewest")}</option>
+                  <option value="price_asc">{t("home.sortPriceAsc")}</option>
+                  <option value="price_desc">{t("home.sortPriceDesc")}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink mb-1">Min pris (kr)</label>
+                <label className="block text-sm font-medium text-ink mb-1">{t("home.minPriceKr")}</label>
                 <input
                   type="number"
                   value={filters.min_price}
@@ -162,7 +164,7 @@ export default function SearchPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink mb-1">Maks pris (kr)</label>
+                <label className="block text-sm font-medium text-ink mb-1">{t("home.maxPriceKr")}</label>
                 <input
                   type="number"
                   value={filters.max_price}
@@ -177,7 +179,7 @@ export default function SearchPage() {
                 onClick={clearFilters}
                 className="mt-3 text-sm text-ink-secondary hover:text-brand underline"
               >
-                Nullstill filtre
+                {t("home.resetFilters")}
               </button>
             )}
           </div>
@@ -185,7 +187,7 @@ export default function SearchPage() {
       </form>
 
       {searched && results.length === 0 && (
-        <p className="text-ink-secondary mt-6">Ingen annonser matcher søket ditt.</p>
+        <p className="text-ink-secondary mt-6">{t("home.noMatches")}</p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
@@ -204,7 +206,7 @@ export default function SearchPage() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">
-                  Ingen bilde
+                  {t("home.noImage")}
                 </div>
               )}
             </div>

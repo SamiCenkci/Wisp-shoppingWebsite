@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { ATTRIBUTE_LABELS } from "@/lib/categories";
+import { useLanguage } from "@/lib/i18n";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 type SavedSearch = {
@@ -22,14 +23,16 @@ type SavedSearch = {
   created_at: string;
 };
 
-const conditionLabels: Record<string, string> = {
-  new: "Ny",
-  like_new: "Som ny",
-  good: "God",
-  fair: "Brukbar",
+// Maps stored condition values (API identifiers) to display-label keys.
+const conditionKeys: Record<string, string> = {
+  new: "saved.conditionNew",
+  like_new: "saved.conditionLikeNew",
+  good: "saved.conditionGood",
+  fair: "saved.conditionFair",
 };
 
 export default function SavedSearchesPage() {
+  const { t, tc } = useLanguage();
   const router = useRouter();
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +64,7 @@ export default function SavedSearchesPage() {
       await api(`/api/saved-searches/${id}`, { method: "DELETE" });
       setSearches((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunne ikke slette");
+      setError(err instanceof Error ? err.message : t("saved.deleteFailed"));
     }
   }
 
@@ -79,33 +82,33 @@ export default function SavedSearchesPage() {
   function describe(s: SavedSearch): string[] {
     const parts: string[] = [];
     if (s.query) parts.push(`«${s.query}»`);
-    if (s.category) parts.push(s.category);
-    if (s.sub_category) parts.push(s.sub_category);
-    if (s.product_category) parts.push(s.product_category);
+    if (s.category) parts.push(tc(s.category));
+    if (s.sub_category) parts.push(tc(s.sub_category));
+    if (s.product_category) parts.push(tc(s.product_category));
 
     // Guard the type: if the API ever sends a string instead of an object,
     // Object.entries would iterate it character by character.
     const attrs = s.attributes;
     if (attrs && typeof attrs === "object") {
       Object.entries(attrs).forEach(([k, v]) => {
-        if (v) parts.push(`${ATTRIBUTE_LABELS[k] ?? k}: ${v}`);
+        if (v) parts.push(`${tc(ATTRIBUTE_LABELS[k] ?? k)}: ${tc(v)}`);
       });
     }
 
     if (s.place) parts.push(`📍 ${s.place}`);
-    if (s.condition) parts.push(conditionLabels[s.condition] ?? s.condition);
-    if (s.ad_type === "giveaway") parts.push("Gis bort");
-    if (s.ad_type === "sale") parts.push("Til salgs");
-    if (s.min_price > 0) parts.push(`Fra ${s.min_price / 100} kr`);
-    if (s.max_price > 0) parts.push(`Til ${s.max_price / 100} kr`);
+    if (s.condition) parts.push(conditionKeys[s.condition] ? t(conditionKeys[s.condition]) : s.condition);
+    if (s.ad_type === "giveaway") parts.push(t("common.free"));
+    if (s.ad_type === "sale") parts.push(t("saved.forSale"));
+    if (s.min_price > 0) parts.push(t("saved.priceFrom", { price: s.min_price / 100 }));
+    if (s.max_price > 0) parts.push(t("saved.priceTo", { price: s.max_price / 100 }));
     return parts;
   }
 
   return (
     <main className="max-w-3xl mx-auto px-[5%] py-8">
-      <h1 className="text-2xl font-bold text-ink mb-2">Lagrede søk</h1>
+      <h1 className="text-2xl font-bold text-ink mb-2">{t("saved.title")}</h1>
       <p className="text-ink-secondary mb-6">
-        Du får en e-post når det kommer nye annonser som matcher.
+        {t("saved.subtitle")}
       </p>
 
       {error && (
@@ -113,15 +116,15 @@ export default function SavedSearchesPage() {
       )}
 
       {loading ? (
-        <p className="text-ink-secondary">Laster...</p>
+        <p className="text-ink-secondary">{t("common.loading")}</p>
       ) : searches.length === 0 ? (
         <div className="bg-surface border border-line rounded-2xl p-12 text-center">
-          <p className="text-ink-secondary mb-4">Du har ingen lagrede søk ennå.</p>
+          <p className="text-ink-secondary mb-4">{t("saved.empty")}</p>
           <button
             onClick={() => router.push("/")}
             className="px-5 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark"
           >
-            Finn noe å lagre
+            {t("saved.findSomething")}
           </button>
         </div>
       ) : (
@@ -133,7 +136,7 @@ export default function SavedSearchesPage() {
                   <h2 className="font-semibold text-ink">{s.name}</h2>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {describe(s).length === 0 ? (
-                      <span className="text-xs text-ink-muted">Alle annonser</span>
+                      <span className="text-xs text-ink-muted">{t("saved.allListings")}</span>
                     ) : (
                       describe(s).map((p, i) => (
                         <span key={i} className="text-xs bg-subtle text-ink-secondary rounded-full px-2.5 py-1">
@@ -147,7 +150,7 @@ export default function SavedSearchesPage() {
                   onClick={() => setDeleteTarget({ id: s.id, name: s.name })}
                   className="shrink-0 text-sm text-red-600 hover:text-red-700 font-medium"
                 >
-                  Slett
+                  {t("common.delete")}
                 </button>
               </div>
 
@@ -155,7 +158,7 @@ export default function SavedSearchesPage() {
                 onClick={() => openSearch(s)}
                 className="mt-4 text-sm text-brand font-medium hover:text-brand-dark"
               >
-                Se resultater →
+                {t("saved.seeResults")}
               </button>
             </div>
           ))}
@@ -164,9 +167,9 @@ export default function SavedSearchesPage() {
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Slette det lagrede søket?"
-        message={deleteTarget ? `«${deleteTarget.name}» blir borte, og du får ikke lenger varsler for det.` : undefined}
-        confirmLabel="Slett"
+        title={t("saved.deleteConfirmTitle")}
+        message={deleteTarget ? t("saved.deleteConfirmMessage", { name: deleteTarget.name }) : undefined}
+        confirmLabel={t("common.delete")}
         danger
         onConfirm={confirmRemove}
         onCancel={() => setDeleteTarget(null)}

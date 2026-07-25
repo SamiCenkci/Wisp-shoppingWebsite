@@ -6,8 +6,10 @@ import { api } from "@/lib/api";
 import { TAXONOMY, getSubs, getProducts, getAttributes } from "@/lib/categories";
 import AddressAutocomplete, { SelectedAddress } from "@/components/AddressAutocomplete";
 import { compressImage } from "@/lib/compressImage";
+import { useLanguage } from "@/lib/i18n";
 
 export default function NewListingPage() {
+  const { t, tc } = useLanguage();
   const router = useRouter();
   const [form, setForm] = useState({
     title: "",
@@ -73,14 +75,14 @@ export default function NewListingPage() {
     const file = await compressImage(original);
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      throw new Error(`${original.name} er for stor. Maks 10 MB per bilde.`);
+      throw new Error(t("forms.fileTooLarge", { name: original.name }));
     }
     const { upload_url, public_url } = await api("/api/uploads/presign", {
       method: "POST",
       body: JSON.stringify({ file_name: file.name, content_type: file.type }),
     });
     const res = await fetch(upload_url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-    if (!res.ok) throw new Error("Bildeopplasting feilet");
+    if (!res.ok) throw new Error(t("forms.imageUploadFailed"));
     return public_url;
   }
 
@@ -88,11 +90,11 @@ export default function NewListingPage() {
     e.preventDefault();
     setError("");
     if (!form.category) {
-      setError("Velg en hovedkategori.");
+      setError(t("forms.chooseMainCategoryError"));
       return;
     }
     if (!form.postal_code) {
-      setError("Velg en adresse fra listen så postnummer fylles ut automatisk.");
+      setError(t("forms.addressRequiredError"));
       return;
     }
     setLoading(true);
@@ -122,7 +124,7 @@ export default function NewListingPage() {
       });
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunne ikke legge ut annonse");
+      setError(err instanceof Error ? err.message : t("forms.createFailed"));
     } finally {
       setLoading(false);
     }
@@ -133,12 +135,12 @@ export default function NewListingPage() {
 
   return (
     <main className="max-w-[1100px] mx-auto px-[5%] py-8">
-      <h1 className="text-2xl font-semibold mb-6 text-ink">Legg ut ny annonse</h1>
+      <h1 className="text-2xl font-semibold mb-6 text-ink">{t("forms.newListingTitle")}</h1>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm lg:sticky lg:top-24">
-            <label className={labelClass}>Bilder</label>
+            <label className={labelClass}>{t("forms.images")}</label>
             <label className="block border-2 border-dashed border-line rounded-xl p-6 text-center cursor-pointer hover:border-brand transition-colors">
               <input
                 type="file"
@@ -148,17 +150,17 @@ export default function NewListingPage() {
                 className="hidden"
               />
               <span className="text-3xl block mb-2">📷</span>
-              <span className="text-sm text-ink-secondary">Klikk for å laste opp bilder</span>
+              <span className="text-sm text-ink-secondary">{t("forms.clickToUpload")}</span>
             </label>
 
             {previews.length > 0 && (
               <div className="grid grid-cols-3 gap-2 mt-3">
                 {previews.map((src, i) => (
-                  <img key={i} src={src} alt={`Forhåndsvisning ${i + 1}`} className="w-full h-20 object-cover rounded-lg" />
+                  <img key={i} src={src} alt={t("forms.previewAlt", { n: i + 1 })} className="w-full h-20 object-cover rounded-lg" />
                 ))}
               </div>
             )}
-            {files.length > 0 && <p className="text-xs text-ink-muted mt-2">{files.length} bilde(r) valgt</p>}
+            {files.length > 0 && <p className="text-xs text-ink-muted mt-2">{t("forms.imagesSelected", { n: files.length })}</p>}
           </div>
         </div>
 
@@ -169,7 +171,7 @@ export default function NewListingPage() {
             )}
 
             <div>
-              <label className={labelClass}>Type annonse</label>
+              <label className={labelClass}>{t("forms.adType")}</label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -180,7 +182,7 @@ export default function NewListingPage() {
                       : "border-line text-ink-secondary hover:border-brand"
                   }`}
                 >
-                  Til salgs
+                  {t("forms.forSale")}
                 </button>
                 <button
                   type="button"
@@ -191,40 +193,40 @@ export default function NewListingPage() {
                       : "border-line text-ink-secondary hover:border-brand"
                   }`}
                 >
-                  Gis bort
+                  {t("forms.giveaway")}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className={labelClass}>Tittel</label>
-              <input value={form.title} onChange={(e) => update("title", e.target.value)} required className={inputClass} placeholder="Hva selger du?" />
+              <label className={labelClass}>{t("forms.title")}</label>
+              <input value={form.title} onChange={(e) => update("title", e.target.value)} required className={inputClass} placeholder={t("forms.titlePlaceholder")} />
             </div>
 
             <div>
-              <label className={labelClass}>Beskrivelse</label>
-              <textarea value={form.description} onChange={(e) => update("description", e.target.value)} required rows={5} className={inputClass} placeholder="Beskriv varen din..." />
+              <label className={labelClass}>{t("forms.description")}</label>
+              <textarea value={form.description} onChange={(e) => update("description", e.target.value)} required rows={5} className={inputClass} placeholder={t("forms.descriptionPlaceholder")} />
             </div>
 
             {/* Category hierarchy */}
             <div className="space-y-3 border border-line rounded-xl p-4">
               <div>
-                <label className={labelClass}>Hovedkategori</label>
+                <label className={labelClass}>{t("forms.mainCategory")}</label>
                 <select value={form.category} onChange={(e) => pickMain(e.target.value)} required className={inputClass}>
-                  <option value="">Velg...</option>
+                  <option value="">{t("forms.select")}</option>
                   {TAXONOMY.map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
+                    <option key={m.name} value={m.name}>{tc(m.name)}</option>
                   ))}
                 </select>
               </div>
 
               {subs.length > 0 && (
                 <div>
-                  <label className={labelClass}>Underkategori</label>
+                  <label className={labelClass}>{t("forms.subCategory")}</label>
                   <select value={form.sub_category} onChange={(e) => pickSub(e.target.value)} className={inputClass}>
-                    <option value="">Velg...</option>
+                    <option value="">{t("forms.select")}</option>
                     {subs.map((s) => (
-                      <option key={s.name} value={s.name}>{s.name}</option>
+                      <option key={s.name} value={s.name}>{tc(s.name)}</option>
                     ))}
                   </select>
                 </div>
@@ -232,11 +234,11 @@ export default function NewListingPage() {
 
               {products.length > 0 && (
                 <div>
-                  <label className={labelClass}>Produktkategori</label>
+                  <label className={labelClass}>{t("forms.productCategory")}</label>
                   <select value={form.product_category} onChange={(e) => pickProduct(e.target.value)} className={inputClass}>
-                    <option value="">Velg...</option>
+                    <option value="">{t("forms.select")}</option>
                     {products.map((p) => (
-                      <option key={p.name} value={p.name}>{p.name}</option>
+                      <option key={p.name} value={p.name}>{tc(p.name)}</option>
                     ))}
                   </select>
                 </div>
@@ -244,15 +246,15 @@ export default function NewListingPage() {
 
               {attrFields.map((field) => (
                 <div key={field.key}>
-                  <label className={labelClass}>{field.label}</label>
+                  <label className={labelClass}>{tc(field.label)}</label>
                   <select
                     value={attributes[field.key] ?? ""}
                     onChange={(e) => setAttributes((prev) => ({ ...prev, [field.key]: e.target.value }))}
                     className={inputClass}
                   >
-                    <option value="">Velg...</option>
+                    <option value="">{t("forms.select")}</option>
                     {field.options.map((o) => (
-                      <option key={o} value={o}>{o}</option>
+                      <option key={o} value={o}>{tc(o)}</option>
                     ))}
                   </select>
                 </div>
@@ -260,12 +262,12 @@ export default function NewListingPage() {
             </div>
 
             <div>
-              <label className={labelClass}>Adresse</label>
+              <label className={labelClass}>{t("forms.address")}</label>
               <AddressAutocomplete
                 value={form.street_address}
                 onChange={(v) => update("street_address", v)}
                 onSelect={onAddressSelect}
-                placeholder="Begynn å skrive adressen..."
+                placeholder={t("forms.addressPlaceholder")}
                 className={inputClass}
               />
               {form.postal_code ? (
@@ -275,7 +277,7 @@ export default function NewListingPage() {
                 </p>
               ) : (
                 <p className="text-xs text-ink-muted mt-1.5">
-                  Velg en adresse fra listen — postnummer og poststed fylles ut automatisk.
+                  {t("forms.addressHint")}
                 </p>
               )}
             </div>
@@ -283,7 +285,7 @@ export default function NewListingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {form.ad_type === "sale" && (
                 <div>
-                  <label className={labelClass}>Pris</label>
+                  <label className={labelClass}>{t("forms.price")}</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -301,12 +303,12 @@ export default function NewListingPage() {
                 </div>
               )}
               <div>
-                <label className={labelClass}>Tilstand</label>
+                <label className={labelClass}>{t("forms.condition")}</label>
                 <select value={form.condition} onChange={(e) => update("condition", e.target.value)} className={inputClass}>
-                  <option value="new">Ny</option>
-                  <option value="like_new">Som ny</option>
-                  <option value="good">God</option>
-                  <option value="fair">Brukbar</option>
+                  <option value="new">{tc("Ny")}</option>
+                  <option value="like_new">{tc("Som ny")}</option>
+                  <option value="good">{tc("God")}</option>
+                  <option value="fair">{tc("Brukbar")}</option>
                 </select>
               </div>
             </div>
@@ -316,7 +318,7 @@ export default function NewListingPage() {
               disabled={loading}
               className="w-full bg-brand text-white rounded-xl py-3 font-medium hover:bg-brand-dark disabled:opacity-50 shadow-sm"
             >
-              {loading ? "Legger ut..." : "Legg ut annonse"}
+              {loading ? t("forms.publishing") : t("forms.publish")}
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 
@@ -20,13 +21,15 @@ type Report = {
   created_at: string;
 };
 
-const reasonLabels: Record<string, string> = {
-  svindel: "Mistanke om svindel",
-  upassende: "Upassende innhold",
-  feil_kategori: "Feil kategori",
-  duplikat: "Duplikat",
-  solgt: "Allerede solgt",
-  annet: "Annet",
+// Maps API reason codes to display-label keys. The codes themselves are
+// identifiers and must not change.
+const reasonKeys: Record<string, string> = {
+  svindel: "admin.reasonSvindel",
+  upassende: "admin.reasonUpassende",
+  feil_kategori: "admin.reasonFeilKategori",
+  duplikat: "admin.reasonDuplikat",
+  solgt: "admin.reasonSolgt",
+  annet: "admin.reasonAnnet",
 };
 
 const statusStyles: Record<string, string> = {
@@ -35,13 +38,16 @@ const statusStyles: Record<string, string> = {
   dismissed: "bg-subtle text-ink-muted border-line",
 };
 
-const statusLabels: Record<string, string> = {
-  open: "Åpen",
-  reviewed: "Behandlet",
-  dismissed: "Avvist",
+// Maps API status values to display-label keys. The values themselves are
+// identifiers and must not change.
+const statusKeys: Record<string, string> = {
+  open: "admin.statusOpen",
+  reviewed: "admin.statusReviewed",
+  dismissed: "admin.statusDismissed",
 };
 
 export default function AdminReportsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [reports, setReports] = useState<Report[]>([]);
   const [openCount, setOpenCount] = useState(0);
@@ -79,7 +85,7 @@ export default function AdminReportsPage() {
       });
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunne ikke oppdatere");
+      setError(err instanceof Error ? err.message : t("admin.updateFailed"));
     }
   }
 
@@ -96,32 +102,34 @@ export default function AdminReportsPage() {
       });
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunne ikke fjerne annonsen");
+      setError(err instanceof Error ? err.message : t("admin.removeFailed"));
     }
   }
 
-  if (loading) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
+  if (loading) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-ink-secondary">{t("common.loading")}</p>;
 
   if (denied) {
     return (
       <main className="max-w-md mx-auto px-[5%] py-20 text-center">
         <div className="text-5xl mb-4">🔒</div>
-        <h1 className="text-2xl font-bold text-ink mb-2">Ingen tilgang</h1>
-        <p className="text-ink-secondary">Denne siden er kun for moderatorer.</p>
+        <h1 className="text-2xl font-bold text-ink mb-2">{t("admin.noAccess")}</h1>
+        <p className="text-ink-secondary">{t("admin.moderatorsOnly")}</p>
       </main>
     );
   }
 
   return (
     <main className="max-w-3xl mx-auto px-[5%] py-8">
-      <h1 className="text-2xl font-bold text-ink mb-1">Rapporterte annonser</h1>
+      <h1 className="text-2xl font-bold text-ink mb-1">{t("admin.title")}</h1>
       <p className="text-ink-secondary mb-6">
-        {openCount} {openCount === 1 ? "åpen rapport" : "åpne rapporter"}
+        {openCount === 1
+          ? t("admin.openReportsOne", { count: openCount })
+          : t("admin.openReportsMany", { count: openCount })}
       </p>
 
       {reports.length === 0 ? (
         <div className="bg-surface border border-line rounded-2xl p-12 text-center">
-          <p className="text-ink-secondary">Ingen rapporter.</p>
+          <p className="text-ink-secondary">{t("admin.noReports")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -139,7 +147,7 @@ export default function AdminReportsPage() {
                       {r.listing_title}
                     </button>
                     <p className="text-xs text-ink-muted mt-0.5">
-                      Rapportert av {reporter} ·{" "}
+                      {t("admin.reportedBy", { name: reporter })} ·{" "}
                       {new Date(r.created_at).toLocaleDateString("nb-NO", {
                         year: "numeric",
                         month: "short",
@@ -152,19 +160,19 @@ export default function AdminReportsPage() {
                       statusStyles[r.status] ?? statusStyles.dismissed
                     }`}
                   >
-                    {statusLabels[r.status] ?? r.status}
+                    {statusKeys[r.status] ? t(statusKeys[r.status]) : r.status}
                   </span>
                 </div>
 
                 <p className="mt-3 text-sm">
-                  <span className="font-medium text-ink">{reasonLabels[r.reason] ?? r.reason}</span>
+                  <span className="font-medium text-ink">{reasonKeys[r.reason] ? t(reasonKeys[r.reason]) : r.reason}</span>
                 </p>
                 {r.details && (
                   <p className="mt-1 text-sm text-ink-secondary whitespace-pre-wrap">{r.details}</p>
                 )}
 
                 {removed && (
-                  <p className="mt-3 text-xs text-ink-muted">Annonsen er allerede fjernet.</p>
+                  <p className="mt-3 text-xs text-ink-muted">{t("admin.alreadyRemoved")}</p>
                 )}
 
                 <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-line">
@@ -174,20 +182,20 @@ export default function AdminReportsPage() {
                         onClick={() => setStatus(r.id, "dismissed")}
                         className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand"
                       >
-                        Avvis
+                        {t("admin.dismiss")}
                       </button>
                       <button
                         onClick={() => setStatus(r.id, "reviewed")}
                         className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand"
                       >
-                        Marker behandlet
+                        {t("admin.markReviewed")}
                       </button>
                       {!removed && (
                         <button
                           onClick={() => setRemoveTarget({ listingId: r.listing_id, reportId: r.id, title: r.listing_title })}
                           className="px-3.5 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700"
                         >
-                          Fjern annonsen
+                          {t("admin.removeListing")}
                         </button>
                       )}
                     </>
@@ -197,7 +205,7 @@ export default function AdminReportsPage() {
                       onClick={() => setStatus(r.id, "open")}
                       className="text-sm text-ink-secondary hover:text-brand underline"
                     >
-                      Gjenåpne
+                      {t("admin.reopen")}
                     </button>
                   )}
                 </div>
@@ -208,9 +216,9 @@ export default function AdminReportsPage() {
       )}
       <ConfirmDialog
         open={Boolean(removeTarget)}
-        title="Fjerne annonsen?"
-        message={removeTarget ? `«${removeTarget.title}» blir skjult fra markedsplassen.` : undefined}
-        confirmLabel="Fjern"
+        title={t("admin.removeConfirmTitle")}
+        message={removeTarget ? t("admin.removeConfirmMessage", { title: removeTarget.title }) : undefined}
+        confirmLabel={t("admin.removeConfirmLabel")}
         danger
         onConfirm={confirmRemove}
         onCancel={() => setRemoveTarget(null)}

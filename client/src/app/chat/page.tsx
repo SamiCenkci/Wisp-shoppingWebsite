@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { compressImage } from "@/lib/compressImage";
+import { useLanguage } from "@/lib/i18n";
 
 type Conversation = {
   id: string;
@@ -33,6 +34,7 @@ function isImage(name: string) {
 }
 
 function ChatInner() {
+  const { t, lang } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -145,12 +147,12 @@ function ChatInner() {
   async function onFilePick(original: File) {
     const file = await compressImage(original);
     if (file.size > 10 * 1024 * 1024) {
-      alert("Filen er for stor. Maks 10 MB.");
+      alert(t("chat.fileTooLarge", { max: 10 }));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
     if (!file.type) {
-      alert("Kunne ikke gjenkjenne filtypen. Prøv en JPG, PNG, GIF, WEBP eller PDF.");
+      alert(t("chat.fileTypeUnknown"));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
@@ -165,10 +167,10 @@ function ChatInner() {
         headers: { "Content-Type": file.type },
         body: file,
       });
-      if (!res.ok) throw new Error("Opplasting feilet");
+      if (!res.ok) throw new Error(t("chat.uploadFailed"));
       setAttachment({ url: public_url, name: file.name });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke laste opp filen");
+      alert(err instanceof Error ? err.message : t("chat.uploadError"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -203,12 +205,12 @@ function ChatInner() {
 
   return (
     <main className="max-w-[1400px] mx-auto px-[5%] py-8">
-      <h1 className="text-2xl font-semibold text-ink mb-6">Meldinger</h1>
+      <h1 className="text-2xl font-semibold text-ink mb-6">{t("nav.messages")}</h1>
 
       <div className="flex flex-col lg:flex-row gap-6 h-[72vh]">
         <aside className="lg:w-96 shrink-0 bg-surface border border-line rounded-2xl shadow-sm overflow-y-auto">
           {conversations.length === 0 ? (
-            <p className="p-6 text-ink-secondary text-sm">Ingen samtaler ennå.</p>
+            <p className="p-6 text-ink-secondary text-sm">{t("chat.noConversations")}</p>
           ) : (
             conversations.map((conv) => (
               <button
@@ -227,7 +229,7 @@ function ChatInner() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm truncate ${conv.unread > 0 ? "font-bold text-ink" : "font-medium text-ink"}`}>
-                    {conv.other_name || "Bruker"}
+                    {conv.other_name || t("chat.userFallback")}
                   </p>
                   <p className="text-xs text-ink-secondary truncate">{conv.listing_title}</p>
                   {conv.last_message && (
@@ -249,7 +251,7 @@ function ChatInner() {
         <section className="flex-1 bg-surface border border-line rounded-2xl shadow-sm flex flex-col">
           {!activeId ? (
             <div className="flex-1 flex items-center justify-center text-ink-secondary">
-              Velg en samtale
+              {t("chat.selectConversation")}
             </div>
           ) : (
             <>
@@ -266,7 +268,7 @@ function ChatInner() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-ink truncate">{active.other_name || "Bruker"}</p>
+                    <p className="font-medium text-ink truncate">{active.other_name || t("chat.userFallback")}</p>
                     <p className="text-sm text-ink-secondary truncate">{active.listing_title}</p>
                   </div>
                   {canReview && (
@@ -277,7 +279,7 @@ function ChatInner() {
                       }}
                       className="shrink-0 px-3.5 py-2 rounded-xl bg-brand text-white text-sm font-medium hover:bg-brand-dark whitespace-nowrap"
                     >
-                      Gi vurdering
+                      {t("chat.leaveReview")}
                     </button>
                   )}
                 </div>
@@ -299,7 +301,7 @@ function ChatInner() {
                               <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="block">
                                 <img
                                   src={msg.attachment_url}
-                                  alt={msg.attachment_name || "bilde"}
+                                  alt={msg.attachment_name || t("chat.imageAlt")}
                                   className="rounded-xl max-h-60 w-auto object-cover border border-black/5"
                                 />
                               </a>
@@ -307,8 +309,8 @@ function ChatInner() {
                               <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" download={msg.attachment_name} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${mine ? "bg-white/15 hover:bg-white/25" : "bg-surface border border-line hover:border-brand"}`}>
                                 <span className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${mine ? "bg-white/20" : "bg-brand-lightest"}`}>📄</span>
                                 <span className="min-w-0">
-                                  <span className={`block truncate font-medium ${mine ? "text-white" : "text-ink"}`}>{msg.attachment_name || "Fil"}</span>
-                                  <span className={`block text-xs ${mine ? "text-white/70" : "text-ink-muted"}`}>Trykk for å laste ned</span>
+                                  <span className={`block truncate font-medium ${mine ? "text-white" : "text-ink"}`}>{msg.attachment_name || t("chat.file")}</span>
+                                  <span className={`block text-xs ${mine ? "text-white/70" : "text-ink-muted"}`}>{t("chat.tapToDownload")}</span>
                                 </span>
                               </a>
                             )}
@@ -316,7 +318,7 @@ function ChatInner() {
                         )}
                         {msg.content && <div>{msg.content}</div>}
                         <div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-ink-muted"}`}>
-                          {new Date(msg.created_at).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
+                          {new Date(msg.created_at).toLocaleTimeString(lang === "en" ? "en-GB" : "nb-NO", { hour: "2-digit", minute: "2-digit" })}
                         </div>
                       </div>
                     </div>
@@ -336,7 +338,7 @@ function ChatInner() {
                       type="button"
                       onClick={() => setAttachment(null)}
                       className="ml-1 w-6 h-6 rounded-full flex items-center justify-center text-ink-muted hover:bg-line hover:text-red-600"
-                      aria-label="Fjern vedlegg"
+                      aria-label={t("chat.removeAttachment")}
                     >
                       ✕
                     </button>
@@ -359,14 +361,14 @@ function ChatInner() {
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading}
                   className="w-10 h-10 shrink-0 rounded-xl border border-line text-ink flex items-center justify-center hover:border-brand hover:text-brand disabled:opacity-50"
-                  aria-label="Legg ved fil"
+                  aria-label={t("chat.attachFile")}
                 >
                   {uploading ? "…" : "📎"}
                 </button>
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  placeholder="Skriv en melding..."
+                  placeholder={t("chat.messagePlaceholder")}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-line bg-subtle outline-none focus:bg-surface focus:border-brand text-sm"
                 />
                 <button
@@ -374,7 +376,7 @@ function ChatInner() {
                   disabled={uploading}
                   className="px-5 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark text-sm disabled:opacity-50"
                 >
-                  Send
+                  {t("common.send")}
                 </button>
               </form>
             </>
@@ -386,8 +388,9 @@ function ChatInner() {
 }
 
 export default function ChatPage() {
+  const { t } = useLanguage();
   return (
-    <Suspense fallback={<main className="max-w-[1400px] mx-auto px-[5%] py-8 text-ink-secondary">Laster...</main>}>
+    <Suspense fallback={<main className="max-w-[1400px] mx-auto px-[5%] py-8 text-ink-secondary">{t("common.loading")}</main>}>
       <ChatInner />
     </Suspense>
   );

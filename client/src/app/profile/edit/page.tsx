@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 import { compressImage } from "@/lib/compressImage";
 
 const currentYear = new Date().getFullYear();
@@ -17,6 +18,7 @@ function formatPhone(digits: string) {
 }
 
 export default function EditProfilePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState({
@@ -78,7 +80,7 @@ export default function EditProfilePage() {
   async function uploadAvatar(original: File) {
     setError("");
     if (!original.type) {
-      setError("Kunne ikke gjenkjenne filtypen. Prøv en JPG, PNG, GIF eller WEBP.");
+      setError(t("profile.unknownFileType"));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
@@ -87,7 +89,7 @@ export default function EditProfilePage() {
     const file = await compressImage(original, 512);
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError("Bildet er for stort. Maks 10 MB.");
+      setError(t("profile.imageTooLarge"));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
@@ -99,10 +101,10 @@ export default function EditProfilePage() {
         body: JSON.stringify({ file_name: file.name, content_type: file.type }),
       });
       const res = await fetch(upload_url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!res.ok) throw new Error("Opplasting feilet");
+      if (!res.ok) throw new Error(t("profile.uploadFailed"));
       setAvatarUrl(public_url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Opplasting feilet");
+      setError(err instanceof Error ? err.message : t("profile.uploadFailed"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -113,11 +115,11 @@ export default function EditProfilePage() {
     e.preventDefault();
     setError("");
     if (birthYearInvalid) {
-      setError(`Fødselsår må være mellom 1900 og ${currentYear}.`);
+      setError(t("profile.birthYearRange", { year: currentYear }));
       return;
     }
     if (phoneInvalid) {
-      setError("Mobilnummer må ha 8 siffer.");
+      setError(t("profile.phoneMustBeEightDigits"));
       return;
     }
     setSaving(true);
@@ -135,7 +137,7 @@ export default function EditProfilePage() {
       );
       router.push(`/profile/${updated.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lagring feilet");
+      setError(err instanceof Error ? err.message : t("profile.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -146,7 +148,7 @@ export default function EditProfilePage() {
 
   return (
     <main className="max-w-2xl mx-auto px-[5%] py-10">
-      <h1 className="text-2xl font-semibold mb-6 text-ink">Rediger profil</h1>
+      <h1 className="text-2xl font-semibold mb-6 text-ink">{t("profile.editProfile")}</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
@@ -154,7 +156,7 @@ export default function EditProfilePage() {
         )}
 
         <section className="bg-surface border border-line rounded-2xl p-6 shadow-sm">
-          <h2 className="font-semibold text-ink mb-4">Fortell om deg selv</h2>
+          <h2 className="font-semibold text-ink mb-4">{t("profile.tellAboutYourself")}</h2>
 
           <div className="flex flex-col items-center mb-6">
             <input
@@ -172,37 +174,37 @@ export default function EditProfilePage() {
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
               className="group relative w-28 h-28 rounded-full bg-brand-lightest overflow-hidden flex items-center justify-center border-2 border-line hover:border-brand transition-colors disabled:opacity-60"
-              aria-label="Endre profilbilde"
+              aria-label={t("profile.changeAvatar")}
             >
               {avatarUrl ? (
-                <img src={avatarUrl} alt="Profilbilde" className="w-full h-full object-cover" />
+                <img src={avatarUrl} alt={t("profile.avatarAlt")} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-brand text-4xl font-bold">{form.name.charAt(0).toUpperCase() || "?"}</span>
               )}
               <span className="absolute inset-0 bg-black/50 text-white text-xs font-medium flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                {uploading ? "Laster opp..." : "Endre bilde"}
+                {uploading ? t("profile.uploadingImage") : t("profile.changeImage")}
               </span>
             </button>
-            <p className="text-xs text-ink-muted mt-2">Trykk på bildet for å endre</p>
+            <p className="text-xs text-ink-muted mt-2">{t("profile.tapToChange")}</p>
           </div>
 
-          <label className={labelClass}>Beskrivelse</label>
+          <label className={labelClass}>{t("profile.bioLabel")}</label>
           <textarea
             value={form.bio}
             onChange={(e) => update("bio", e.target.value)}
             rows={3}
             maxLength={500}
             className={inputClass}
-            placeholder="Beskrivelsen kan ikke inneholde telefonnumre, e-postadresser eller lenker. Maksimum 500 tegn."
+            placeholder={t("profile.bioPlaceholder")}
           />
-          <p className="text-xs text-ink-muted mt-1">{form.bio.length}/500 tegn</p>
+          <p className="text-xs text-ink-muted mt-1">{t("profile.charCount", { count: form.bio.length })}</p>
         </section>
 
         <section className="bg-surface border border-line rounded-2xl p-6 shadow-sm">
-          <h2 className="font-semibold text-ink mb-4">Om deg</h2>
+          <h2 className="font-semibold text-ink mb-4">{t("profile.aboutYou")}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>Navn</label>
+              <label className={labelClass}>{t("profile.nameLabel")}</label>
               <input
                 value={form.name}
                 onChange={(e) => updateName("name", e.target.value, 60)}
@@ -211,7 +213,7 @@ export default function EditProfilePage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Visningsnavn</label>
+              <label className={labelClass}>{t("profile.displayNameLabel")}</label>
               <input
                 value={form.display_name}
                 onChange={(e) => updateName("display_name", e.target.value, 40)}
@@ -219,7 +221,7 @@ export default function EditProfilePage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Født (årstall)</label>
+              <label className={labelClass}>{t("profile.birthYearLabel")}</label>
               <input
                 inputMode="numeric"
                 value={form.birth_year}
@@ -228,20 +230,20 @@ export default function EditProfilePage() {
                 placeholder="2002"
               />
               {birthYearInvalid && (
-                <p className="text-xs text-red-600 mt-1">Må være mellom 1900 og {currentYear}</p>
+                <p className="text-xs text-red-600 mt-1">{t("profile.birthYearHint", { year: currentYear })}</p>
               )}
             </div>
             <div>
-              <label className={labelClass}>Kjønn</label>
+              <label className={labelClass}>{t("profile.genderLabel")}</label>
               <select value={form.gender} onChange={(e) => update("gender", e.target.value)} className={inputClass}>
-                <option value="">Velg...</option>
-                <option value="Mann">Mann</option>
-                <option value="Kvinne">Kvinne</option>
-                <option value="Annet">Annet</option>
+                <option value="">{t("profile.selectPlaceholder")}</option>
+                <option value="Mann">{t("profile.genderMale")}</option>
+                <option value="Kvinne">{t("profile.genderFemale")}</option>
+                <option value="Annet">{t("profile.genderOther")}</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Mobilnummer</label>
+              <label className={labelClass}>{t("profile.phoneLabel")}</label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-line bg-subtle text-ink-secondary text-sm shrink-0">
                   +47
@@ -256,16 +258,16 @@ export default function EditProfilePage() {
                   placeholder="123 45 678"
                 />
               </div>
-              {phoneInvalid && <p className="text-xs text-red-600 mt-1">Må ha 8 siffer</p>}
+              {phoneInvalid && <p className="text-xs text-red-600 mt-1">{t("profile.phoneHint")}</p>}
             </div>
           </div>
         </section>
 
         <section className="bg-surface border border-line rounded-2xl p-6 shadow-sm">
-          <h2 className="font-semibold text-ink mb-4">Adresse</h2>
+          <h2 className="font-semibold text-ink mb-4">{t("profile.addressSection")}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
-              <label className={labelClass}>Gateadresse</label>
+              <label className={labelClass}>{t("profile.streetAddress")}</label>
               <input
                 value={form.street_address}
                 onChange={(e) => update("street_address", e.target.value)}
@@ -274,7 +276,7 @@ export default function EditProfilePage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Postnummer</label>
+              <label className={labelClass}>{t("profile.postalCode")}</label>
               <input
                 inputMode="numeric"
                 value={form.postal_code}
@@ -284,7 +286,7 @@ export default function EditProfilePage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Poststed</label>
+              <label className={labelClass}>{t("profile.cityLabel")}</label>
               <input
                 value={form.city}
                 onChange={(e) => updateName("city", e.target.value, 60)}
@@ -292,7 +294,7 @@ export default function EditProfilePage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Land</label>
+              <label className={labelClass}>{t("profile.countryLabel")}</label>
               <input
                 value={form.country}
                 onChange={(e) => updateName("country", e.target.value, 60)}
@@ -307,7 +309,7 @@ export default function EditProfilePage() {
           disabled={saving || uploading}
           className="w-full bg-brand text-white rounded-lg py-2.5 font-medium hover:bg-brand-dark disabled:opacity-50"
         >
-          {saving ? "Lagrer..." : "Lagre endringer"}
+          {saving ? t("common.saving") : t("profile.saveChanges")}
         </button>
       </form>
     </main>

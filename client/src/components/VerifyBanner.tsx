@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 
 export default function VerifyBanner() {
+  const { t } = useLanguage();
   const [show, setShow] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -37,17 +39,17 @@ export default function VerifyBanner() {
     <div className="bg-amber-50 border-b border-amber-200">
       <div className="max-w-[1400px] mx-auto px-[5%] py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="text-amber-900">
-          Bekreft e-postadressen din for å legge ut annonser og sende meldinger.
+          {t("nav.verifyPrompt")}
         </span>
         {sent ? (
-          <span className="text-amber-900 font-medium">Ny lenke sendt ✓</span>
+          <span className="text-amber-900 font-medium">{t("nav.linkSent")}</span>
         ) : (
           <button
             onClick={resend}
             disabled={sending}
             className="font-medium text-amber-900 underline hover:no-underline disabled:opacity-50"
           >
-            {sending ? "Sender..." : "Send lenken på nytt"}
+            {sending ? t("common.sending") : t("nav.resendLink")}
           </button>
         )}
       </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 type Image = { id: string; url: string };
@@ -20,19 +21,21 @@ type Listing = {
 type Buyer = { id: string; name: string; display_name: string };
 
 const TABS = [
-  { key: "all", label: "Alle" },
-  { key: "active", label: "Aktive" },
-  { key: "sold", label: "Solgt" },
-  { key: "expired", label: "Utløpt" },
+  { key: "all", labelKey: "profile.tabAll" },
+  { key: "active", labelKey: "profile.tabActive" },
+  { key: "sold", labelKey: "profile.tabSold" },
+  { key: "expired", labelKey: "profile.tabExpired" },
 ];
 
-const STATUS_LABEL: Record<string, string> = {
-  active: "Aktiv",
-  sold: "Solgt",
-  expired: "Utløpt",
+// Status values from the API stay Norwegian-agnostic keys; only labels are translated.
+const STATUS_LABEL_KEY: Record<string, string> = {
+  active: "common.active",
+  sold: "common.sold",
+  expired: "common.expired",
 };
 
 export default function MyListingsPage() {
+  const { t, tc } = useLanguage();
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +91,7 @@ export default function MyListingsPage() {
       await api(`/api/listings/${id}`, { method: "DELETE" });
       setListings((prev) => prev.filter((l) => l.id !== id));
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Sletting feilet");
+      setActionError(err instanceof Error ? err.message : t("profile.deleteFailed"));
     }
   }
 
@@ -101,7 +104,7 @@ export default function MyListingsPage() {
       });
       setListings((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Kunne ikke oppdatere");
+      setActionError(err instanceof Error ? err.message : t("profile.updateFailed"));
     }
   }
 
@@ -132,7 +135,7 @@ export default function MyListingsPage() {
       setSoldModal(null);
     } catch (err) {
       setSoldModal(null);
-      setActionError(err instanceof Error ? err.message : "Kunne ikke markere som solgt");
+      setActionError(err instanceof Error ? err.message : t("profile.markSoldFailed"));
     }
   }
 
@@ -152,34 +155,34 @@ export default function MyListingsPage() {
       <aside className="lg:w-72 shrink-0">
         <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm lg:sticky lg:top-24">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-lg font-semibold text-ink">Mine annonser</h1>
+            <h1 className="text-lg font-semibold text-ink">{t("nav.myListings")}</h1>
           </div>
 
           <button
             onClick={() => router.push("/new")}
             className="w-full mb-4 px-4 py-2.5 rounded-xl text-white font-medium bg-brand hover:bg-brand-dark text-sm shadow-sm"
           >
-            + Ny annonse
+            {t("nav.newListing")}
           </button>
 
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Søk i mine annonser..."
+            placeholder={t("profile.searchMyListings")}
             className="w-full mb-4 px-3.5 py-2.5 rounded-xl border border-line bg-subtle outline-none focus:bg-surface focus:border-brand text-sm"
           />
 
           <div className="flex flex-col gap-1">
-            {TABS.map((t) => (
+            {TABS.map((tabItem) => (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
+                key={tabItem.key}
+                onClick={() => setTab(tabItem.key)}
                 className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  tab === t.key ? "bg-brand-lightest text-brand" : "text-ink-secondary hover:bg-subtle"
+                  tab === tabItem.key ? "bg-brand-lightest text-brand" : "text-ink-secondary hover:bg-subtle"
                 }`}
               >
-                <span>{t.label}</span>
-                <span className={tab === t.key ? "text-brand" : "text-ink-muted"}>{countFor(t.key)}</span>
+                <span>{t(tabItem.labelKey)}</span>
+                <span className={tab === tabItem.key ? "text-brand" : "text-ink-muted"}>{countFor(tabItem.key)}</span>
               </button>
             ))}
           </div>
@@ -194,12 +197,12 @@ export default function MyListingsPage() {
         )}
 
         {loading ? (
-          <p className="text-ink-secondary">Laster...</p>
+          <p className="text-ink-secondary">{t("common.loading")}</p>
         ) : loadError ? (
           <p className="text-red-600">{loadError}</p>
         ) : filtered.length === 0 ? (
           <div className="bg-surface border border-line rounded-2xl p-16 text-center">
-            <p className="text-ink-secondary">Ingen annonser her.</p>
+            <p className="text-ink-secondary">{t("profile.noListingsHere")}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -216,7 +219,7 @@ export default function MyListingsPage() {
                     <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted">
-                      Ingen bilde
+                      {t("profile.noImage")}
                     </div>
                   )}
                 </div>
@@ -236,14 +239,14 @@ export default function MyListingsPage() {
                           : "bg-red-50 text-red-600"
                       }`}
                     >
-                      {STATUS_LABEL[listing.status] ?? listing.status}
+                      {STATUS_LABEL_KEY[listing.status] ? t(STATUS_LABEL_KEY[listing.status]) : listing.status}
                     </span>
                   </div>
                   <p className="text-brand font-semibold text-lg mt-1">
                     {(listing.price_ore / 100).toLocaleString("nb-NO")} kr
                   </p>
                   <p className="text-sm text-ink-secondary mt-0.5">
-                    {listing.category} · {listing.municipality}
+                    {tc(listing.category)} · {listing.municipality}
                   </p>
                 </div>
 
@@ -253,7 +256,7 @@ export default function MyListingsPage() {
                       onClick={() => openSoldModal(listing.id, listing.title)}
                       className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand whitespace-nowrap"
                     >
-                      Marker solgt
+                      {t("profile.markSold")}
                     </button>
                   ) : (
                     <>
@@ -262,14 +265,14 @@ export default function MyListingsPage() {
                           onClick={() => router.push(`/review/${listing.id}`)}
                           className="px-3.5 py-2 rounded-xl bg-brand text-white text-sm hover:bg-brand-dark whitespace-nowrap"
                         >
-                          Gi vurdering
+                          {t("profile.giveReview")}
                         </button>
                       )}
                       <button
                         onClick={() => setStatus(listing.id, "active")}
                         className="px-3.5 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:border-brand hover:text-brand whitespace-nowrap"
                       >
-                        Aktiver
+                        {t("profile.activate")}
                       </button>
                     </>
                   )}
@@ -281,7 +284,7 @@ export default function MyListingsPage() {
                         setOpenMenu(openMenu === listing.id ? null : listing.id);
                       }}
                       className="w-10 h-10 rounded-xl border border-line text-ink-secondary hover:border-brand hover:text-brand flex items-center justify-center text-lg leading-none"
-                      aria-label="Flere valg"
+                      aria-label={t("profile.moreOptions")}
                     >
                       ⋮
                     </button>
@@ -295,19 +298,19 @@ export default function MyListingsPage() {
                           onClick={() => router.push(`/listings/${listing.id}`)}
                           className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-subtle"
                         >
-                          Se annonsen
+                          {t("profile.viewListing")}
                         </button>
                         <button
                           onClick={() => router.push(`/edit/${listing.id}`)}
                           className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-subtle"
                         >
-                          Endre annonsen
+                          {t("profile.editListing")}
                         </button>
                         <button
                           onClick={() => setDeleteTarget({ id: listing.id, title: listing.title })}
                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                         >
-                          Slett
+                          {t("common.delete")}
                         </button>
                       </div>
                     )}
@@ -328,14 +331,14 @@ export default function MyListingsPage() {
             className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-md p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-ink mb-1">Hvem solgte du til?</h2>
+            <h2 className="text-lg font-semibold text-ink mb-1">{t("profile.whoDidYouSellTo")}</h2>
             <p className="text-sm text-ink-secondary mb-5">{soldModal.title}</p>
 
             {loadingBuyers ? (
-              <p className="text-ink-secondary text-sm py-4">Laster...</p>
+              <p className="text-ink-secondary text-sm py-4">{t("common.loading")}</p>
             ) : buyers.length === 0 ? (
               <p className="text-ink-secondary text-sm py-4">
-                Ingen har sendt melding om denne annonsen ennå, så det er ingen kjøper å velge.
+                {t("profile.noBuyersYet")}
               </p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -358,7 +361,7 @@ export default function MyListingsPage() {
               onClick={() => setSoldModal(null)}
               className="mt-5 w-full py-2.5 rounded-xl border border-line text-ink-secondary hover:text-ink"
             >
-              Avbryt
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -366,9 +369,9 @@ export default function MyListingsPage() {
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Slette annonsen?"
-        message={deleteTarget ? `"${deleteTarget.title}" blir borte for godt.` : undefined}
-        confirmLabel="Slett"
+        title={t("profile.deleteListingTitle")}
+        message={deleteTarget ? t("profile.deleteListingMessage", { title: deleteTarget.title }) : undefined}
+        confirmLabel={t("common.delete")}
         danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}

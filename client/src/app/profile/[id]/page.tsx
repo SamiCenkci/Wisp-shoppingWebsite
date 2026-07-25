@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 import StarRating from "@/components/StarRating";
 
 type Image = { id: string; url: string };
@@ -38,6 +39,7 @@ type Review = {
 };
 
 export default function ProfilePage() {
+  const { t } = useLanguage();
   const params = useParams();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -89,8 +91,8 @@ export default function ProfilePage() {
       .catch(() => setFavorites([]));
   }, [isOwn, params.id]);
 
-  if (loading) return <p className="max-w-[1400px] mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
-  if (!profile) return <p className="max-w-[1400px] mx-auto px-[5%] py-10">Bruker ikke funnet.</p>;
+  if (loading) return <p className="max-w-[1400px] mx-auto px-[5%] py-10 text-ink-secondary">{t("common.loading")}</p>;
+  if (!profile) return <p className="max-w-[1400px] mx-auto px-[5%] py-10">{t("profile.userNotFound")}</p>;
 
   const memberSince = new Date(profile.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "long" });
   const displayName = profile.display_name || profile.name;
@@ -108,14 +110,14 @@ export default function ProfilePage() {
               )}
             </div>
             <h1 className="text-xl font-bold text-ink mt-4">{displayName}</h1>
-            <p className="text-sm text-ink-secondary mt-1">Medlem siden {memberSince}</p>
+            <p className="text-sm text-ink-secondary mt-1">{t("profile.memberSince", { date: memberSince })}</p>
 
             {reviewCount > 0 && (
               <div className="mt-3 flex flex-col items-center gap-1">
                 <StarRating value={Math.round(avgRating)} readOnly size="sm" />
                 <p className="text-sm text-ink-secondary">
-                  <span className="font-semibold text-ink">{avgRating.toFixed(1)}</span> av 5 · {reviewCount}{" "}
-                  {reviewCount === 1 ? "vurdering" : "vurderinger"}
+                  <span className="font-semibold text-ink">{avgRating.toFixed(1)}</span> {t("profile.outOfFive")} · {reviewCount}{" "}
+                  {reviewCount === 1 ? t("profile.reviewSingular") : t("profile.reviewPlural")}
                 </p>
               </div>
             )}
@@ -126,19 +128,19 @@ export default function ProfilePage() {
                   onClick={() => router.push("/profile/edit")}
                   className="mt-4 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
                 >
-                  Rediger profil
+                  {t("profile.editProfile")}
                 </button>
                 <button
                   onClick={() => router.push("/my-reviews")}
                   className="mt-2 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
                 >
-                  Vurderinger
+                  {t("profile.reviewsTitle")}
                 </button>
                 <button
                   onClick={() => router.push("/saved-searches")}
                   className="mt-2 w-full px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm font-medium hover:border-brand hover:text-brand"
                 >
-                  Lagrede søk
+                  {t("profile.savedSearches")}
                 </button>
               </>
             )}
@@ -147,7 +149,7 @@ export default function ProfilePage() {
           <div className="mt-6 pt-6 border-t border-line space-y-3 text-sm">
             <div className="flex items-center gap-2 text-ink-secondary">
               <span className="text-ink-muted">📋</span>
-              <span>{listings.length} aktive annonser</span>
+              <span>{t("profile.activeListingsCount", { count: listings.length })}</span>
             </div>
             {profile.city && (
               <div className="flex items-center gap-2 text-ink-secondary">
@@ -165,7 +167,7 @@ export default function ProfilePage() {
 
           {profile.bio && (
             <div className="mt-6 pt-6 border-t border-line">
-              <h2 className="text-sm font-semibold text-ink mb-2">Om {displayName}</h2>
+              <h2 className="text-sm font-semibold text-ink mb-2">{t("profile.aboutUser", { name: displayName })}</h2>
               <p className="text-sm text-ink-secondary whitespace-pre-wrap leading-relaxed">{profile.bio}</p>
             </div>
           )}
@@ -174,12 +176,12 @@ export default function ProfilePage() {
 
       <section className="flex-1">
         <h2 className="text-xl font-semibold text-ink mb-5">
-          Aktive annonser <span className="text-ink-muted font-normal text-base">({listings.length})</span>
+          {t("profile.activeListings")} <span className="text-ink-muted font-normal text-base">({listings.length})</span>
         </h2>
 
         {listings.length === 0 ? (
           <div className="bg-surface border border-line rounded-2xl p-16 text-center">
-            <p className="text-ink-secondary">Ingen aktive annonser.</p>
+            <p className="text-ink-secondary">{t("profile.noActiveListings")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -193,7 +195,7 @@ export default function ProfilePage() {
                   {listing.images && listing.images.length > 0 ? (
                     <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
+                    <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">{t("profile.noImage")}</div>
                   )}
                 </div>
                 <div className="p-4">
@@ -210,7 +212,7 @@ export default function ProfilePage() {
 
         {isOwn && favorites.length > 0 && (
           <div className="mt-12">
-            <h2 className="text-xl font-semibold text-ink mb-5">Likte annonser</h2>
+            <h2 className="text-xl font-semibold text-ink mb-5">{t("profile.favoriteListings")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {favorites.map((listing) => (
                 <div
@@ -222,7 +224,7 @@ export default function ProfilePage() {
                     {listing.images && listing.images.length > 0 ? (
                       <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
+                      <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">{t("profile.noImage")}</div>
                     )}
                   </div>
                   <div className="p-4">
@@ -240,12 +242,12 @@ export default function ProfilePage() {
 
         <div className="mt-12">
           <h2 className="text-xl font-semibold text-ink mb-5">
-            Vurderinger <span className="text-ink-muted font-normal text-base">({reviewCount})</span>
+            {t("profile.reviewsTitle")} <span className="text-ink-muted font-normal text-base">({reviewCount})</span>
           </h2>
 
           {reviews.length === 0 ? (
             <div className="bg-surface border border-line rounded-2xl p-10 text-center">
-              <p className="text-ink-secondary">Ingen vurderinger ennå.</p>
+              <p className="text-ink-secondary">{t("profile.noReviewsYet")}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -275,15 +277,15 @@ export default function ProfilePage() {
 
                     <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                       <div className="flex items-center justify-between sm:block">
-                        <span className="text-ink-secondary">Kommunikasjon</span>
+                        <span className="text-ink-secondary">{t("profile.communication")}</span>
                         <StarRating value={r.communication} readOnly size="sm" />
                       </div>
                       <div className="flex items-center justify-between sm:block">
-                        <span className="text-ink-secondary">Pålitelighet</span>
+                        <span className="text-ink-secondary">{t("profile.reliability")}</span>
                         <StarRating value={r.reliability} readOnly size="sm" />
                       </div>
                       <div className="flex items-center justify-between sm:block">
-                        <span className="text-ink-secondary">Som beskrevet</span>
+                        <span className="text-ink-secondary">{t("profile.asDescribed")}</span>
                         <StarRating value={r.as_described} readOnly size="sm" />
                       </div>
                     </div>

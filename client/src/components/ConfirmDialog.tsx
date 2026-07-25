@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/lib/i18n";
+
 type Props = {
   open: boolean;
   title: string;
@@ -15,13 +17,17 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Bekreft",
-  cancelLabel = "Avbryt",
+  confirmLabel,
+  cancelLabel,
   danger = false,
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useLanguage();
   if (!open) return null;
+
+  confirmLabel = confirmLabel ?? t("common.confirm");
+  cancelLabel = cancelLabel ?? t("common.cancel");
 
   return (
     <div

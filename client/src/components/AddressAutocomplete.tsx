@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export type SelectedAddress = {
   street: string;
@@ -32,9 +33,10 @@ export default function AddressAutocomplete({
   value,
   onChange,
   onSelect,
-  placeholder = "Skriv inn adresse...",
+  placeholder,
   className = "",
 }: Props) {
+  const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -100,13 +102,13 @@ export default function AddressAutocomplete({
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("forms.addressInputPlaceholder")}
         autoComplete="off"
         className={className}
       />
 
       {loading && (
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-muted">Søker...</span>
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-muted">{t("forms.searching")}</span>
       )}
 
       {open && suggestions.length > 0 && (

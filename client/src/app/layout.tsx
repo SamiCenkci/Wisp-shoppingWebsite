@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ChatBot from "@/components/ChatBot";
 import VerifyBanner from "@/components/VerifyBanner";
+import { LanguageProvider } from "@/lib/i18n";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="no"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
@@ -49,11 +50,13 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col">
-        <Navbar />
-        <VerifyBanner />
-        <main className="flex-1">{children}</main>
-        <ChatBot />
-        <Footer />
+        <LanguageProvider>
+          <Navbar />
+          <VerifyBanner />
+          <main className="flex-1">{children}</main>
+          <ChatBot />
+          <Footer />
+        </LanguageProvider>
       </body>
     </html>
   );

@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { expiryLabel } from "@/lib/expiry";
+import { useLanguage } from "@/lib/i18n";
 import dynamic from "next/dynamic";
 import { ATTRIBUTE_LABELS } from "@/lib/categories";
 
 const ListingMap = dynamic(() => import("@/components/ListingMap"), { ssr: false });
 
+// Norwegian display labels for the canonical condition codes from the API;
+// wrapped in tc() at render time for English display.
 const conditionLabels: Record<string, string> = {
   new: "Ny",
   like_new: "Som ny",
@@ -16,13 +19,15 @@ const conditionLabels: Record<string, string> = {
   fair: "Brukbar",
 };
 
+// The `value` is the Norwegian code sent to the API and must stay unchanged;
+// only the label shown in the dropdown is translated.
 const reportReasons = [
-  { value: "svindel", label: "Mistanke om svindel" },
-  { value: "upassende", label: "Upassende innhold" },
-  { value: "feil_kategori", label: "Feil kategori" },
-  { value: "duplikat", label: "Duplikat av annen annonse" },
-  { value: "solgt", label: "Varen er allerede solgt" },
-  { value: "annet", label: "Annet" },
+  { value: "svindel", labelKey: "listing.reasonFraud" },
+  { value: "upassende", labelKey: "listing.reasonInappropriate" },
+  { value: "feil_kategori", labelKey: "listing.reasonWrongCategory" },
+  { value: "duplikat", labelKey: "listing.reasonDuplicate" },
+  { value: "solgt", labelKey: "listing.reasonAlreadySold" },
+  { value: "annet", labelKey: "listing.reasonOther" },
 ];
 
 type Image = { id: string; url: string };
@@ -59,6 +64,7 @@ type Seller = {
 type Buyer = { id: string; name: string; display_name: string };
 
 export default function ListingDetailPage() {
+  const { t, tc } = useLanguage();
   const params = useParams();
   const router = useRouter();
   const [listing, setListing] = useState<Listing | null>(null);
@@ -148,7 +154,7 @@ export default function ListingDetailPage() {
       setSoldModal(false);
       await loadListing();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke markere som solgt");
+      alert(err instanceof Error ? err.message : t("listing.couldNotMarkSold"));
     }
   }
 
@@ -167,7 +173,7 @@ export default function ListingDetailPage() {
       setLikeCount(data.like_count ?? 0);
       setLiked(data.liked_by_me ?? false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke oppdatere");
+      alert(err instanceof Error ? err.message : t("listing.couldNotUpdate"));
     }
   }
 
@@ -185,7 +191,7 @@ export default function ListingDetailPage() {
       });
       router.push(`/chat?c=${conv.id}`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Kunne ikke starte samtale");
+      alert(err instanceof Error ? err.message : t("listing.couldNotStartConversation"));
     }
   }
 
@@ -195,7 +201,7 @@ export default function ListingDetailPage() {
       return;
     }
     if (!reportReason) {
-      setReportMsg("Velg en årsak.");
+      setReportMsg(t("listing.chooseReason"));
       return;
     }
     setReporting(true);
@@ -205,40 +211,39 @@ export default function ListingDetailPage() {
         method: "POST",
         body: JSON.stringify({ reason: reportReason, details: reportDetails }),
       });
-      setReportMsg("Takk. Rapporten er mottatt.");
+      setReportMsg(t("listing.reportReceived"));
       setTimeout(() => setReportOpen(false), 1500);
     } catch (err) {
-      setReportMsg(err instanceof Error ? err.message : "Kunne ikke sende rapporten");
+      setReportMsg(err instanceof Error ? err.message : t("listing.couldNotSendReport"));
     } finally {
       setReporting(false);
     }
   }
 
-  if (loading) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-ink-secondary">Laster...</p>;
+  if (loading) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-ink-secondary">{t("common.loading")}</p>;
   if (error) return <p className="max-w-3xl mx-auto px-[5%] py-10 text-red-600">{error}</p>;
-  if (!listing) return <p className="max-w-3xl mx-auto px-[5%] py-10">Annonse ikke funnet.</p>;
+  if (!listing) return <p className="max-w-3xl mx-auto px-[5%] py-10">{t("listing.notFound")}</p>;
 
   if (listing.deleted_at) {
     return (
       <main className="max-w-2xl mx-auto px-[5%] py-16 text-center">
         <div className="text-5xl mb-4">🗑️</div>
-        <h1 className="text-2xl font-bold text-ink mb-2">Annonsen er slettet</h1>
+        <h1 className="text-2xl font-bold text-ink mb-2">{t("listing.deletedTitle")}</h1>
         <p className="text-ink-secondary mb-8">
-          &laquo;{listing.title}&raquo; er ikke lenger tilgjengelig. Meldingene dine om annonsen er
-          fortsatt bevart.
+          {t("listing.deletedBody", { title: listing.title })}
         </p>
         <div className="flex gap-3 justify-center">
           <button
             onClick={() => router.push("/")}
             className="px-5 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark"
           >
-            Se andre annonser
+            {t("listing.browseOtherListings")}
           </button>
           <button
             onClick={() => router.push("/chat")}
             className="px-5 py-2.5 rounded-xl border border-line text-ink-secondary font-medium hover:border-brand hover:text-brand"
           >
-            Gå til meldinger
+            {t("listing.goToMessages")}
           </button>
         </div>
       </main>
@@ -248,13 +253,13 @@ export default function ListingDetailPage() {
   return (
     <main className="max-w-[1100px] mx-auto px-[5%] py-8">
       <button onClick={() => router.push("/")} className="text-brand text-sm mb-4 hover:underline">
-        ← Tilbake til annonser
+        {t("listing.backToListings")}
       </button>
       {listing.status !== "active" && (
         <div className="mb-4 rounded-xl bg-subtle border border-line px-4 py-3 text-sm text-ink-secondary">
           {listing.status === "sold"
-            ? "Denne annonsen er markert som solgt og er ikke lenger aktiv."
-            : "Denne annonsen er utløpt og er ikke lenger aktiv."}
+            ? t("listing.soldBanner")
+            : t("listing.expiredBanner")}
         </div>
       )}
 
@@ -273,7 +278,7 @@ export default function ListingDetailPage() {
             </div>
           ) : (
             <div className="w-full h-80 rounded-2xl bg-subtle flex items-center justify-center text-ink-muted">
-              Ingen bilde
+              {t("listing.noImage")}
             </div>
           )}
         </div>
@@ -281,7 +286,7 @@ export default function ListingDetailPage() {
         <div className="lg:sticky lg:top-24 self-start">
           <h1 className="text-3xl font-bold text-ink">{listing.title}</h1>
           <p className="text-3xl text-brand font-bold mt-3">
-            {listing.ad_type === "giveaway" ? "Gratis" : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
+            {listing.ad_type === "giveaway" ? t("listing.free") : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
           </p>
 
           <button
@@ -293,19 +298,19 @@ export default function ListingDetailPage() {
             }`}
           >
             <span>{liked ? "❤️" : "🤍"}</span>
-            <span>{likeCount} liker</span>
+            <span>{t("listing.likes", { n: likeCount })}</span>
           </button>
 
           <div className="flex flex-wrap gap-2 mt-4 text-sm">
-            <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{listing.category}</span>
+            <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{tc(listing.category)}</span>
             {listing.sub_category && (
-              <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{listing.sub_category}</span>
+              <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{tc(listing.sub_category)}</span>
             )}
             {listing.product_category && (
-              <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{listing.product_category}</span>
+              <span className="bg-brand-lightest text-brand rounded-full px-3 py-1">{tc(listing.product_category)}</span>
             )}
             <span className="bg-subtle text-ink-secondary rounded-full px-3 py-1">
-              {conditionLabels[listing.condition] ?? listing.condition}
+              {tc(conditionLabels[listing.condition] ?? listing.condition)}
             </span>
           </div>
 
@@ -314,8 +319,8 @@ export default function ListingDetailPage() {
               {Object.entries(attributes).map(([key, value]) =>
                 value ? (
                   <div key={key} className="flex justify-between px-4 py-2.5">
-                    <dt className="text-ink-secondary">{ATTRIBUTE_LABELS[key] ?? key}</dt>
-                    <dd className="text-ink font-medium">{value}</dd>
+                    <dt className="text-ink-secondary">{tc(ATTRIBUTE_LABELS[key] ?? key)}</dt>
+                    <dd className="text-ink font-medium">{tc(value)}</dd>
                   </div>
                 ) : null
               )}
@@ -326,13 +331,13 @@ export default function ListingDetailPage() {
 
           <div className="mt-5 pt-5 border-t border-line text-sm text-ink-secondary space-y-1">
             <p>📍 {listing.municipality}, {listing.county}</p>
-            <p>⏱ {expiryLabel(listing.created_at)}</p>
-            <p>👁 {listing.view_count ?? 0} visninger</p>
+            <p>⏱ {expiryLabel(listing.created_at, t)}</p>
+            <p>👁 {t("listing.views", { n: listing.view_count ?? 0 })}</p>
           </div>
 
           {listing.latitude && listing.longitude ? (
             <div className="mt-5">
-              <p className="text-sm font-medium text-ink mb-2">Omtrentlig område</p>
+              <p className="text-sm font-medium text-ink mb-2">{t("listing.approximateArea")}</p>
               <ListingMap
                 latitude={listing.latitude}
                 longitude={listing.longitude}
@@ -344,21 +349,21 @@ export default function ListingDetailPage() {
           {isOwn ? (
             <div className="mt-6 space-y-3">
               <div className="w-full bg-subtle text-ink-muted rounded-lg py-3 font-medium text-center border border-line">
-                Dette er din egen annonse
+                {t("listing.ownListing")}
               </div>
               {listing.status !== "sold" && (
                 <button
                   onClick={openSoldModal}
                   className="w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark"
                 >
-                  Marker som solgt
+                  {t("listing.markAsSold")}
                 </button>
               )}
               <button
                 onClick={() => router.push(`/edit/${listing.id}`)}
                 className="w-full border border-line text-ink-secondary rounded-lg py-3 font-medium hover:border-brand hover:text-brand"
               >
-                Endre annonsen
+                {t("listing.editListing")}
               </button>
             </div>
           ) : (
@@ -366,7 +371,7 @@ export default function ListingDetailPage() {
               onClick={startConversation}
               className="mt-6 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark"
             >
-              Send melding til selger
+              {t("listing.messageSeller")}
             </button>
           )}
 
@@ -375,7 +380,7 @@ export default function ListingDetailPage() {
               onClick={() => router.push(`/review/${listing.id}`)}
               className="mt-3 w-full bg-brand text-white rounded-lg py-3 font-medium hover:bg-brand-dark"
             >
-              Gi vurdering
+              {t("listing.leaveReview")}
             </button>
           )}
 
@@ -396,11 +401,12 @@ export default function ListingDetailPage() {
               <div className="flex-1">
                 <p className="font-medium text-ink">{seller.display_name || seller.name}</p>
                 <p className="text-xs text-ink-secondary">
-                  Medlem siden{" "}
-                  {new Date(seller.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "long" })}
+                  {t("listing.memberSince", {
+                    date: new Date(seller.created_at).toLocaleDateString("nb-NO", { year: "numeric", month: "long" }),
+                  })}
                 </p>
               </div>
-              <span className="text-brand text-sm">Se profil →</span>
+              <span className="text-brand text-sm">{t("listing.viewProfile")}</span>
             </div>
           )}
 
@@ -409,7 +415,7 @@ export default function ListingDetailPage() {
               onClick={() => setReportOpen(true)}
               className="mt-4 w-full text-sm text-ink-muted hover:text-red-600 underline"
             >
-              🚩 Rapporter annonsen
+              🚩 {t("listing.reportListing")}
             </button>
           )}
         </div>
@@ -417,7 +423,7 @@ export default function ListingDetailPage() {
 
       {similar.length > 0 && (
         <section className="mt-12">
-          <h2 className="text-xl font-semibold text-ink mb-5">Lignende annonser</h2>
+          <h2 className="text-xl font-semibold text-ink mb-5">{t("listing.similarListings")}</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
             {similar.map((s) => (
               <div
@@ -429,13 +435,13 @@ export default function ListingDetailPage() {
                   {s.images && s.images.length > 0 ? (
                     <img src={s.images[0].url} alt={s.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted">Ingen bilde</div>
+                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted">{t("listing.noImage")}</div>
                   )}
                 </div>
                 <div className="p-3">
                   <h3 className="font-medium text-sm truncate text-ink">{s.title}</h3>
                   <p className="font-semibold text-ink mt-0.5">
-                    {s.ad_type === "giveaway" ? "Gratis" : `${(s.price_ore / 100).toLocaleString("nb-NO")} kr`}
+                    {s.ad_type === "giveaway" ? t("listing.free") : `${(s.price_ore / 100).toLocaleString("nb-NO")} kr`}
                   </p>
                 </div>
               </div>
@@ -453,14 +459,14 @@ export default function ListingDetailPage() {
             className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-md p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-ink mb-1">Hvem solgte du til?</h2>
+            <h2 className="text-lg font-semibold text-ink mb-1">{t("listing.whoDidYouSellTo")}</h2>
             <p className="text-sm text-ink-secondary mb-5">{listing.title}</p>
 
             {loadingBuyers ? (
-              <p className="text-ink-secondary text-sm py-4">Laster...</p>
+              <p className="text-ink-secondary text-sm py-4">{t("common.loading")}</p>
             ) : buyers.length === 0 ? (
               <p className="text-ink-secondary text-sm py-4">
-                Ingen har sendt melding om denne annonsen ennå, så det er ingen kjøper å velge.
+                {t("listing.noBuyers")}
               </p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -483,7 +489,7 @@ export default function ListingDetailPage() {
               onClick={() => setSoldModal(false)}
               className="mt-5 w-full py-2.5 rounded-xl border border-line text-ink-secondary hover:text-ink"
             >
-              Avbryt
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -498,31 +504,31 @@ export default function ListingDetailPage() {
             className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-md p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-ink mb-1">Rapporter annonsen</h2>
+            <h2 className="text-lg font-semibold text-ink mb-1">{t("listing.reportListing")}</h2>
             <p className="text-sm text-ink-secondary mb-5">
-              Rapporten går til moderatorene våre. Vi ser på alle innmeldinger.
+              {t("listing.reportIntro")}
             </p>
 
-            <label className="block text-sm font-medium text-ink mb-1.5">Årsak</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("listing.reason")}</label>
             <select
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
               className="w-full border border-line rounded-xl px-3.5 py-2.5 bg-surface outline-none focus:border-brand mb-4"
             >
-              <option value="">Velg årsak...</option>
+              <option value="">{t("listing.chooseReasonPlaceholder")}</option>
               {reportReasons.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
+                <option key={r.value} value={r.value}>{t(r.labelKey)}</option>
               ))}
             </select>
 
-            <label className="block text-sm font-medium text-ink mb-1.5">Utdyp (valgfritt)</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("listing.detailsOptional")}</label>
             <textarea
               value={reportDetails}
               onChange={(e) => setReportDetails(e.target.value)}
               rows={3}
               maxLength={1000}
               className="w-full border border-line rounded-xl px-3.5 py-2.5 bg-surface outline-none focus:border-brand"
-              placeholder="Beskriv kort hva som er problemet..."
+              placeholder={t("listing.detailsPlaceholder")}
             />
 
             {reportMsg && <p className="text-sm text-ink-secondary mt-3">{reportMsg}</p>}
@@ -532,14 +538,14 @@ export default function ListingDetailPage() {
                 onClick={() => setReportOpen(false)}
                 className="flex-1 py-2.5 rounded-xl border border-line text-ink-secondary font-medium hover:text-ink"
               >
-                Avbryt
+                {t("common.cancel")}
               </button>
               <button
                 onClick={submitReport}
                 disabled={reporting}
                 className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50"
               >
-                {reporting ? "Sender..." : "Send rapport"}
+                {reporting ? t("common.sending") : t("listing.sendReport")}
               </button>
             </div>
           </div>

@@ -1,0 +1,41 @@
+import type { Namespace } from "./index";
+
+// Saved searches page.
+export const saved: Namespace = {
+  no: {
+    title: "Lagrede søk",
+    subtitle: "Du får en e-post når det kommer nye annonser som matcher.",
+    empty: "Du har ingen lagrede søk ennå.",
+    findSomething: "Finn noe å lagre",
+    allListings: "Alle annonser",
+    seeResults: "Se resultater →",
+    deleteFailed: "Kunne ikke slette",
+    deleteConfirmTitle: "Slette det lagrede søket?",
+    deleteConfirmMessage: "«{name}» blir borte, og du får ikke lenger varsler for det.",
+    conditionNew: "Ny",
+    conditionLikeNew: "Som ny",
+    conditionGood: "God",
+    conditionFair: "Brukbar",
+    forSale: "Til salgs",
+    priceFrom: "Fra {price} kr",
+    priceTo: "Til {price} kr",
+  },
+  en: {
+    title: "Saved searches",
+    subtitle: "You'll get an email when new listings match.",
+    empty: "You have no saved searches yet.",
+    findSomething: "Find something to save",
+    allListings: "All listings",
+    seeResults: "See results →",
+    deleteFailed: "Could not delete",
+    deleteConfirmTitle: "Delete this saved search?",
+    deleteConfirmMessage: "“{name}” will be gone, and you'll no longer get alerts for it.",
+    conditionNew: "New",
+    conditionLikeNew: "Like new",
+    conditionGood: "Good",
+    conditionFair: "Fair",
+    forSale: "For sale",
+    priceFrom: "From {price} kr",
+    priceTo: "Up to {price} kr",
+  },
+};

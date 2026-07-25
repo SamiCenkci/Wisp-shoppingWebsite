@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 
 export default function SignupPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -23,7 +25,7 @@ export default function SignupPage() {
       });
       router.push("/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Noe gikk galt");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -36,7 +38,7 @@ export default function SignupPage() {
           <button onClick={() => router.push("/")} className="text-3xl font-bold text-brand tracking-tight">
             Wisp
           </button>
-          <p className="text-ink-secondary mt-2">Opprett en konto</p>
+          <p className="text-ink-secondary mt-2">{t("auth.signupSubtitle")}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-surface border border-line rounded-2xl shadow-lg p-8 space-y-5">
@@ -47,10 +49,10 @@ export default function SignupPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">Navn</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("auth.name")}</label>
             <input
               type="text"
-              placeholder="Ditt navn"
+              placeholder={t("auth.namePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -59,10 +61,10 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">E-post</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("auth.email")}</label>
             <input
               type="email"
-              placeholder="din@epost.no"
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -71,10 +73,10 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">Passord</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("auth.password")}</label>
             <input
               type="password"
-              placeholder="Minst 8 tegn"
+              placeholder={t("auth.passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -87,14 +89,14 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-brand text-white rounded-xl py-3 font-medium hover:bg-brand-dark disabled:opacity-50 shadow-sm"
           >
-            {loading ? "Oppretter..." : "Registrer deg"}
+            {loading ? t("auth.creatingAccount") : t("auth.signUp")}
           </button>
         </form>
 
         <p className="text-sm text-center mt-6 text-ink-secondary">
-          Har du allerede konto?{" "}
+          {t("auth.alreadyHaveAccount")}{" "}
           <button onClick={() => router.push("/login")} className="text-brand font-medium hover:text-brand-dark">
-            Logg inn
+            {t("nav.login")}
           </button>
         </p>
       </div>

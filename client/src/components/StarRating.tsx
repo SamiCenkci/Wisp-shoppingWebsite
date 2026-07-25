@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/lib/i18n";
+
 type Props = {
   value: number;
   onChange?: (value: number) => void;
@@ -8,6 +10,7 @@ type Props = {
 };
 
 export default function StarRating({ value, onChange, readOnly = false, size = "md" }: Props) {
+  const { t } = useLanguage();
   const sizeClass = size === "lg" ? "text-3xl" : size === "sm" ? "text-base" : "text-2xl";
 
   return (
@@ -21,7 +24,7 @@ export default function StarRating({ value, onChange, readOnly = false, size = "
           className={`${sizeClass} leading-none transition-transform ${
             readOnly ? "cursor-default" : "cursor-pointer hover:scale-110"
           }`}
-          aria-label={`${star} av 5`}
+          aria-label={t("listing.starOutOf5", { n: star })}
         >
           <span className={star <= value ? "text-yellow-400" : "text-ink-muted opacity-30"}>★</span>
         </button>

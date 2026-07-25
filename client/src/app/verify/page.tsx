@@ -3,8 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 
 function VerifyInner() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -14,7 +16,7 @@ function VerifyInner() {
     const token = searchParams.get("token");
     if (!token) {
       setStatus("error");
-      setMessage("Lenken mangler en token.");
+      setMessage(t("auth.tokenMissing"));
       return;
     }
 
@@ -32,26 +34,26 @@ function VerifyInner() {
       })
       .catch((err) => {
         setStatus("error");
-        setMessage(err instanceof Error ? err.message : "Bekreftelsen feilet.");
+        setMessage(err instanceof Error ? err.message : t("auth.verifyFailed"));
       });
   }, [searchParams]);
 
   return (
     <main className="max-w-md mx-auto px-[5%] py-20 text-center">
-      {status === "loading" && <p className="text-ink-secondary">Bekrefter...</p>}
+      {status === "loading" && <p className="text-ink-secondary">{t("auth.verifying")}</p>}
 
       {status === "ok" && (
         <>
           <div className="text-5xl mb-4">✅</div>
-          <h1 className="text-2xl font-bold text-ink mb-2">E-postadressen er bekreftet</h1>
+          <h1 className="text-2xl font-bold text-ink mb-2">{t("auth.emailVerified")}</h1>
           <p className="text-ink-secondary mb-8">
-            Du kan nå legge ut annonser og sende meldinger.
+            {t("auth.verifiedInfo")}
           </p>
           <button
             onClick={() => router.push("/")}
             className="px-5 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark"
           >
-            Til forsiden
+            {t("auth.toFrontPage")}
           </button>
         </>
       )}
@@ -59,13 +61,13 @@ function VerifyInner() {
       {status === "error" && (
         <>
           <div className="text-5xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-ink mb-2">Kunne ikke bekrefte</h1>
+          <h1 className="text-2xl font-bold text-ink mb-2">{t("auth.couldNotVerify")}</h1>
           <p className="text-ink-secondary mb-8">{message}</p>
           <button
             onClick={() => router.push("/")}
             className="px-5 py-2.5 rounded-xl border border-line text-ink-secondary font-medium hover:border-brand hover:text-brand"
           >
-            Til forsiden
+            {t("auth.toFrontPage")}
           </button>
         </>
       )}
@@ -74,8 +76,9 @@ function VerifyInner() {
 }
 
 export default function VerifyPage() {
+  const { t } = useLanguage();
   return (
-    <Suspense fallback={<main className="max-w-md mx-auto px-[5%] py-20 text-center text-ink-secondary">Laster...</main>}>
+    <Suspense fallback={<main className="max-w-md mx-auto px-[5%] py-20 text-center text-ink-secondary">{t("common.loading")}</main>}>
       <VerifyInner />
     </Suspense>
   );

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 import {
   CATEGORIES,
   CATEGORY_ICONS,
@@ -40,6 +41,7 @@ const emptyFilters = {
 };
 
 function HomeInner() {
+  const { t, tc } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [listings, setListings] = useState<Listing[]>([]);
@@ -198,7 +200,7 @@ function HomeInner() {
         filters.product_category ||
         filters.sub_category ||
         filters.category ||
-        "Mitt søk"
+        t("home.mySearch")
     );
     setSavedMsg("");
     setNameModalOpen(true);
@@ -226,9 +228,9 @@ function HomeInner() {
         }),
       });
       setNameModalOpen(false);
-      setSavedMsg("Søket er lagret ✓");
+      setSavedMsg(t("home.searchSaved"));
     } catch (err) {
-      setSavedMsg(err instanceof Error ? err.message : "Kunne ikke lagre søket");
+      setSavedMsg(err instanceof Error ? err.message : t("home.searchSaveError"));
     } finally {
       setSavingSearch(false);
     }
@@ -280,7 +282,7 @@ function HomeInner() {
                     className="flex items-center gap-2 text-left text-xs leading-tight text-ink-secondary hover:text-brand transition-colors"
                   >
                     <span className="text-base leading-none shrink-0">{CATEGORY_ICONS[cat] ?? "🏷️"}</span>
-                    <span>{cat}</span>
+                    <span>{tc(cat)}</span>
                   </button>
                 ))}
               </div>
@@ -288,7 +290,7 @@ function HomeInner() {
               <div>
                 <div className="flex items-center flex-wrap gap-1.5 text-sm mb-3">
                   <button onClick={() => navigate({})} className="text-brand hover:text-brand-dark">
-                    Alle kategorier
+                    {t("home.allCategories")}
                   </button>
                   <span className="text-ink-muted">/</span>
                   {filters.sub_category ? (
@@ -297,13 +299,13 @@ function HomeInner() {
                         onClick={() => navigate({ category: filters.category })}
                         className="text-brand hover:text-brand-dark"
                       >
-                        {filters.category}
+                        {tc(filters.category)}
                       </button>
                       <span className="text-ink-muted">/</span>
-                      <span className="font-medium text-ink">{filters.sub_category}</span>
+                      <span className="font-medium text-ink">{tc(filters.sub_category)}</span>
                     </>
                   ) : (
-                    <span className="font-medium text-ink">{filters.category}</span>
+                    <span className="font-medium text-ink">{tc(filters.category)}</span>
                   )}
                 </div>
 
@@ -323,7 +325,7 @@ function HomeInner() {
                           active ? "text-brand font-medium" : "text-ink-secondary hover:text-brand"
                         }`}
                       >
-                        {name}
+                        {tc(name)}
                       </button>
                     );
                   })}
@@ -338,20 +340,20 @@ function HomeInner() {
         {(isSearchResult || filters.category) && (
           <aside className="w-64 shrink-0 hidden lg:block">
             <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm sticky top-24">
-              <h2 className="font-semibold text-ink mb-4">Filtrer søk</h2>
+              <h2 className="font-semibold text-ink mb-4">{t("home.filterSearch")}</h2>
 
               <div className="space-y-4">
                 {filterSubs.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-ink mb-1">Underkategori</label>
+                    <label className="block text-sm font-medium text-ink mb-1">{t("home.subCategory")}</label>
                     <select
                       value={filters.sub_category}
                       onChange={(e) => navigate({ category: filters.category, sub: e.target.value })}
                       className={inputClass}
                     >
-                      <option value="">Alle</option>
+                      <option value="">{t("home.all")}</option>
                       {filterSubs.map((s) => (
-                        <option key={s.name} value={s.name}>{s.name}</option>
+                        <option key={s.name} value={s.name}>{tc(s.name)}</option>
                       ))}
                     </select>
                   </div>
@@ -359,7 +361,7 @@ function HomeInner() {
 
                 {filterProducts.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-ink mb-1">Produktkategori</label>
+                    <label className="block text-sm font-medium text-ink mb-1">{t("home.productCategory")}</label>
                     <select
                       value={filters.product_category}
                       onChange={(e) =>
@@ -371,9 +373,9 @@ function HomeInner() {
                       }
                       className={inputClass}
                     >
-                      <option value="">Alle</option>
+                      <option value="">{t("home.all")}</option>
                       {filterProducts.map((p) => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
+                        <option key={p.name} value={p.name}>{tc(p.name)}</option>
                       ))}
                     </select>
                   </div>
@@ -381,76 +383,76 @@ function HomeInner() {
 
                 {filterAttrs.map((field) => (
                   <div key={field.key}>
-                    <label className="block text-sm font-medium text-ink mb-1">{field.label}</label>
+                    <label className="block text-sm font-medium text-ink mb-1">{tc(field.label)}</label>
                     <select
                       value={attrFilters[field.key] ?? ""}
                       onChange={(e) => pickAttr(field.key, e.target.value)}
                       className={inputClass}
                     >
-                      <option value="">Alle</option>
+                      <option value="">{t("home.all")}</option>
                       {field.options.map((o) => (
-                        <option key={o} value={o}>{o}</option>
+                        <option key={o} value={o}>{tc(o)}</option>
                       ))}
                     </select>
                   </div>
                 ))}
 
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Sted eller postnummer</label>
+                  <label className="block text-sm font-medium text-ink mb-1">{t("home.placeOrZip")}</label>
                   <input
                     value={filters.place}
                     onChange={(e) => update("place", e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && runSearch()}
                     className={inputClass}
-                    placeholder="f.eks. Oslo eller 0150"
+                    placeholder={t("home.placePlaceholder")}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Type annonse</label>
+                  <label className="block text-sm font-medium text-ink mb-1">{t("home.adType")}</label>
                   <select value={filters.ad_type} onChange={(e) => update("ad_type", e.target.value)} className={inputClass}>
-                    <option value="">Alle</option>
-                    <option value="sale">Til salgs</option>
-                    <option value="giveaway">Gis bort</option>
+                    <option value="">{t("home.all")}</option>
+                    <option value="sale">{t("home.forSale")}</option>
+                    <option value="giveaway">{t("common.free")}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-2">Prisklasse</label>
+                  <label className="block text-sm font-medium text-ink mb-2">{t("home.priceRange")}</label>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-ink-muted mb-1">Fra</label>
-                      <input type="number" value={filters.min_price} onChange={(e) => update("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="0 kr" />
+                      <label className="block text-xs text-ink-muted mb-1">{t("home.from")}</label>
+                      <input type="number" value={filters.min_price} onChange={(e) => update("min_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder={t("home.pricePlaceholderZero")} />
                     </div>
                     <div>
-                      <label className="block text-xs text-ink-muted mb-1">Til</label>
-                      <input type="number" value={filters.max_price} onChange={(e) => update("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder="Maks" />
+                      <label className="block text-xs text-ink-muted mb-1">{t("home.to")}</label>
+                      <input type="number" value={filters.max_price} onChange={(e) => update("max_price", e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} className={inputClass} placeholder={t("home.pricePlaceholderMax")} />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Tilstand</label>
+                  <label className="block text-sm font-medium text-ink mb-1">{t("home.condition")}</label>
                   <select value={filters.condition} onChange={(e) => update("condition", e.target.value)} className={inputClass}>
-                    <option value="">Alle</option>
-                    <option value="new">Ny</option>
-                    <option value="like_new">Som ny</option>
-                    <option value="good">God</option>
-                    <option value="fair">Brukbar</option>
+                    <option value="">{t("home.all")}</option>
+                    <option value="new">{t("home.conditionNew")}</option>
+                    <option value="like_new">{t("home.conditionLikeNew")}</option>
+                    <option value="good">{t("home.conditionGood")}</option>
+                    <option value="fair">{t("home.conditionFair")}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Sortering</label>
+                  <label className="block text-sm font-medium text-ink mb-1">{t("home.sorting")}</label>
                   <select value={filters.sort_by} onChange={(e) => update("sort_by", e.target.value)} className={inputClass}>
-                    <option value="newest">Nyeste først</option>
-                    <option value="price_asc">Pris: lav til høy</option>
-                    <option value="price_desc">Pris: høy til lav</option>
+                    <option value="newest">{t("home.sortNewest")}</option>
+                    <option value="price_asc">{t("home.sortPriceAsc")}</option>
+                    <option value="price_desc">{t("home.sortPriceDesc")}</option>
                   </select>
                 </div>
 
                 <button onClick={() => runSearch()} className="w-full bg-brand text-white rounded-lg py-2 font-medium hover:bg-brand-dark">
-                  Bruk filtre
+                  {t("home.applyFilters")}
                 </button>
 
                 <button
@@ -458,14 +460,14 @@ function HomeInner() {
                   disabled={savingSearch}
                   className="w-full border border-brand text-brand rounded-lg py-2 font-medium hover:bg-brand-lightest disabled:opacity-50"
                 >
-                  {savingSearch ? "Lagrer..." : "🔔 Lagre søk"}
+                  {savingSearch ? t("common.saving") : `🔔 ${t("home.saveSearch")}`}
                 </button>
                 {savedMsg && !nameModalOpen && (
                   <p className="text-xs text-center text-ink-secondary">{savedMsg}</p>
                 )}
 
                 <button onClick={resetAll} className="w-full text-sm text-ink-secondary hover:text-brand underline">
-                  Nullstill
+                  {t("home.reset")}
                 </button>
               </div>
             </div>
@@ -475,14 +477,14 @@ function HomeInner() {
         <section className="flex-1">
           <div className="flex items-center justify-between mb-5">
             <h1 className="text-xl font-semibold text-ink">
-              {isSearchResult || filters.category ? "Søkeresultater" : "Siste annonser"}
+              {isSearchResult || filters.category ? t("home.searchResults") : t("home.latestListings")}
               <span className="text-ink-muted font-normal text-base ml-2">
                 ({listings.length})
               </span>
             </h1>
             {(isSearchResult || filters.category) && (
               <button onClick={resetAll} className="text-sm text-ink-secondary hover:text-brand underline">
-                Vis alle annonser
+                {t("home.showAllListings")}
               </button>
             )}
           </div>
@@ -502,7 +504,7 @@ function HomeInner() {
           ) : listings.length === 0 ? (
             <div className="bg-surface border border-line rounded-2xl p-16 text-center">
               <p className="text-ink-secondary">
-                {isSearchResult ? "Ingen annonser matcher søket ditt." : "Ingen annonser ennå."}
+                {isSearchResult ? t("home.noMatches") : t("home.noListingsYet")}
               </p>
             </div>
           ) : (
@@ -517,28 +519,28 @@ function HomeInner() {
                     <button
                       onClick={(e) => toggleLike(e, listing.id)}
                       className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-surface/90 backdrop-blur flex items-center justify-center text-lg hover:scale-110 transition-transform shadow-sm"
-                      aria-label="Lik annonse"
+                      aria-label={t("home.likeListing")}
                     >
                       {likedIds.has(listing.id) ? "❤️" : "🤍"}
                     </button>
                     {listing.images && listing.images.length > 0 ? (
                       <img src={listing.images[0].url} alt={listing.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">Ingen bilde</div>
+                      <div className="w-full h-full flex items-center justify-center text-sm text-ink-muted">{t("home.noImage")}</div>
                     )}
                     <span className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-surface/90 text-ink-secondary backdrop-blur">
-                      {listing.category}
+                      {tc(listing.category)}
                     </span>
                     {listing.ad_type === "giveaway" && (
                       <span className="absolute bottom-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-brand text-white">
-                        Gis bort
+                        {t("common.free")}
                       </span>
                     )}
                   </div>
                   <div className="p-4">
                     <h3 className="font-medium truncate text-ink">{listing.title}</h3>
                     <p className="font-semibold mt-1 text-lg text-ink">
-                      {listing.ad_type === "giveaway" ? "Gratis" : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
+                      {listing.ad_type === "giveaway" ? t("home.freePrice") : `${(listing.price_ore / 100).toLocaleString("nb-NO")} kr`}
                     </p>
                     <p className="text-sm mt-1 text-ink-secondary">{listing.municipality}, {listing.county}</p>
                   </div>
@@ -558,12 +560,12 @@ function HomeInner() {
             className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-sm p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-ink mb-1">Lagre søket</h2>
+            <h2 className="text-lg font-semibold text-ink mb-1">{t("home.saveSearchTitle")}</h2>
             <p className="text-sm text-ink-secondary mb-4">
-              Du får en e-post når det kommer nye annonser som matcher.
+              {t("home.saveSearchDesc")}
             </p>
 
-            <label className="block text-sm font-medium text-ink mb-1.5">Navn på søket</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("home.searchNameLabel")}</label>
             <input
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
@@ -580,14 +582,14 @@ function HomeInner() {
                 onClick={() => setNameModalOpen(false)}
                 className="flex-1 py-2.5 rounded-xl border border-line text-ink-secondary font-medium hover:text-ink"
               >
-                Avbryt
+                {t("common.cancel")}
               </button>
               <button
                 onClick={saveCurrentSearch}
                 disabled={savingSearch || !searchName.trim()}
                 className="flex-1 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark disabled:opacity-50"
               >
-                {savingSearch ? "Lagrer..." : "Lagre"}
+                {savingSearch ? t("common.saving") : t("common.save")}
               </button>
             </div>
           </div>
@@ -598,8 +600,9 @@ function HomeInner() {
 }
 
 export default function HomePage() {
+  const { t } = useLanguage();
   return (
-    <Suspense fallback={<main className="max-w-[1400px] mx-auto px-[5%] py-8 text-ink-secondary">Laster...</main>}>
+    <Suspense fallback={<main className="max-w-[1400px] mx-auto px-[5%] py-8 text-ink-secondary">{t("common.loading")}</main>}>
       <HomeInner />
     </Suspense>
   );

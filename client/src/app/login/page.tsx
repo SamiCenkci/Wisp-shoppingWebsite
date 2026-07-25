@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +26,7 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Innlogging feilet");
+      setError(err instanceof Error ? err.message : t("auth.loginFailed"));
     } finally {
       setLoading(false);
     }
@@ -37,7 +39,7 @@ export default function LoginPage() {
           <button onClick={() => router.push("/")} className="text-3xl font-bold text-brand tracking-tight">
             Wisp
           </button>
-          <p className="text-ink-secondary mt-2">Logg inn for å fortsette</p>
+          <p className="text-ink-secondary mt-2">{t("auth.loginSubtitle")}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-surface border border-line rounded-2xl shadow-lg p-8 space-y-5">
@@ -48,10 +50,10 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">E-post</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("auth.email")}</label>
             <input
               type="email"
-              placeholder="din@epost.no"
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -60,7 +62,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">Passord</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">{t("auth.password")}</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -76,14 +78,14 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-brand text-white rounded-xl py-3 font-medium hover:bg-brand-dark disabled:opacity-50 shadow-sm"
           >
-            {loading ? "Logger inn..." : "Logg inn"}
+            {loading ? t("auth.loggingIn") : t("nav.login")}
           </button>
         </form>
 
         <p className="text-sm text-center mt-6 text-ink-secondary">
-          Ny her?{" "}
+          {t("auth.newHere")}{" "}
           <button onClick={() => router.push("/signup")} className="text-brand font-medium hover:text-brand-dark">
-            Registrer deg
+            {t("auth.signUp")}
           </button>
         </p>
       </div>

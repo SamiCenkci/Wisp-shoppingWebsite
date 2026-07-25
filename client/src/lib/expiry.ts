@@ -8,10 +8,14 @@ export function daysLeft(createdAt: string): number {
   return Math.ceil(msLeft / (24 * 60 * 60 * 1000));
 }
 
-// A friendly Norwegian label for the time left
-export function expiryLabel(createdAt: string): string {
+// A friendly label for the time left. This is a plain lib without hook
+// access, so the caller passes in `t` from useLanguage().
+export function expiryLabel(
+  createdAt: string,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): string {
   const d = daysLeft(createdAt);
-  if (d <= 0) return "Utløpt";
-  if (d === 1) return "1 dag igjen";
-  return `${d} dager igjen`;
+  if (d <= 0) return t("common.expired");
+  if (d === 1) return t("listing.oneDayLeft");
+  return t("listing.daysLeft", { n: d });
 }

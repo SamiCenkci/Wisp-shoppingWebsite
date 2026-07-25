@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
 import StarRating from "@/components/StarRating";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -23,6 +24,7 @@ type Review = {
 };
 
 export default function MyReviewsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [tab, setTab] = useState<"received" | "given">("received");
   const [received, setReceived] = useState<Review[]>([]);
@@ -74,7 +76,7 @@ export default function MyReviewsPage() {
       setReplyText("");
       loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunne ikke lagre svar");
+      setError(err instanceof Error ? err.message : t("reviews.replyError"));
     }
   }
 
@@ -87,7 +89,7 @@ export default function MyReviewsPage() {
       await api(`/api/reviews/${id}`, { method: "DELETE" });
       loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunne ikke slette");
+      setError(err instanceof Error ? err.message : t("reviews.deleteError"));
     }
   }
 
@@ -95,7 +97,7 @@ export default function MyReviewsPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-[5%] py-8">
-      <h1 className="text-2xl font-bold text-ink mb-6">Vurderinger</h1>
+      <h1 className="text-2xl font-bold text-ink mb-6">{t("reviews.myReviewsTitle")}</h1>
 
       <div className="flex gap-2 mb-6 border-b border-line">
         <button
@@ -104,7 +106,7 @@ export default function MyReviewsPage() {
             tab === "received" ? "border-brand text-brand" : "border-transparent text-ink-secondary hover:text-ink"
           }`}
         >
-          Vurderinger fått ({received.length})
+          {t("reviews.tabReceived", { count: received.length })}
         </button>
         <button
           onClick={() => setTab("given")}
@@ -112,16 +114,16 @@ export default function MyReviewsPage() {
             tab === "given" ? "border-brand text-brand" : "border-transparent text-ink-secondary hover:text-ink"
           }`}
         >
-          Vurderinger gitt ({given.length})
+          {t("reviews.tabGiven", { count: given.length })}
         </button>
       </div>
 
       {loading ? (
-        <p className="text-ink-secondary">Laster...</p>
+        <p className="text-ink-secondary">{t("common.loading")}</p>
       ) : list.length === 0 ? (
         <div className="bg-surface border border-line rounded-2xl p-12 text-center">
           <p className="text-ink-secondary">
-            {tab === "received" ? "Du har ikke fått noen vurderinger ennå." : "Du har ikke gitt noen vurderinger ennå."}
+            {tab === "received" ? t("reviews.emptyReceived") : t("reviews.emptyGiven")}
           </p>
         </div>
       ) : (
@@ -130,8 +132,8 @@ export default function MyReviewsPage() {
             const avg = (r.communication + r.reliability + r.as_described) / 3;
             const other =
               tab === "received"
-                ? r.reviewer_display_name || r.reviewer_name || "Bruker"
-                : r.reviewed_display_name || r.reviewed_name || "Bruker";
+                ? r.reviewer_display_name || r.reviewer_name || t("reviews.defaultUser")
+                : r.reviewed_display_name || r.reviewed_name || t("reviews.defaultUser");
 
             return (
               <div key={r.id} className="bg-surface border border-line rounded-2xl p-5 shadow-sm">
@@ -142,7 +144,7 @@ export default function MyReviewsPage() {
                     </span>
                     <div>
                       <p className="font-medium text-ink">
-                        {tab === "received" ? `Fra ${other}` : `Til ${other}`}
+                        {tab === "received" ? t("reviews.fromUser", { name: other }) : t("reviews.toUser", { name: other })}
                       </p>
                       <button
                         onClick={() => router.push(`/listings/${r.listing_id}`)}
@@ -161,15 +163,15 @@ export default function MyReviewsPage() {
 
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   <div className="flex items-center justify-between sm:block">
-                    <span className="text-ink-secondary">Kommunikasjon</span>
+                    <span className="text-ink-secondary">{t("reviews.communication")}</span>
                     <StarRating value={r.communication} readOnly size="sm" />
                   </div>
                   <div className="flex items-center justify-between sm:block">
-                    <span className="text-ink-secondary">Pålitelighet</span>
+                    <span className="text-ink-secondary">{t("reviews.reliability")}</span>
                     <StarRating value={r.reliability} readOnly size="sm" />
                   </div>
                   <div className="flex items-center justify-between sm:block">
-                    <span className="text-ink-secondary">Som beskrevet</span>
+                    <span className="text-ink-secondary">{t("reviews.asDescribed")}</span>
                     <StarRating value={r.as_described} readOnly size="sm" />
                   </div>
                 </div>
@@ -180,7 +182,7 @@ export default function MyReviewsPage() {
 
                 {r.reply && (
                   <div className="mt-4 ml-4 pl-4 border-l-2 border-brand">
-                    <p className="text-xs font-semibold text-brand mb-1">Svar</p>
+                    <p className="text-xs font-semibold text-brand mb-1">{t("reviews.reply")}</p>
                     <p className="text-ink whitespace-pre-wrap">{r.reply}</p>
                   </div>
                 )}
@@ -194,7 +196,7 @@ export default function MyReviewsPage() {
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
                           rows={3}
-                          placeholder="Skriv et svar..."
+                          placeholder={t("reviews.replyPlaceholder")}
                           className="w-full border border-line rounded-xl px-3 py-2 bg-subtle text-ink outline-none focus:bg-surface focus:border-brand text-sm"
                         />
                         <div className="flex gap-2">
@@ -202,7 +204,7 @@ export default function MyReviewsPage() {
                             onClick={() => submitReply(r.id)}
                             className="px-4 py-2 rounded-xl bg-brand text-white text-sm font-medium hover:bg-brand-dark"
                           >
-                            Send svar
+                            {t("reviews.sendReply")}
                           </button>
                           <button
                             onClick={() => {
@@ -211,7 +213,7 @@ export default function MyReviewsPage() {
                             }}
                             className="px-4 py-2 rounded-xl border border-line text-ink-secondary text-sm hover:text-ink"
                           >
-                            Avbryt
+                            {t("common.cancel")}
                           </button>
                         </div>
                       </div>
@@ -223,7 +225,7 @@ export default function MyReviewsPage() {
                         }}
                         className="text-sm text-brand font-medium hover:text-brand-dark"
                       >
-                        Svar på vurderingen
+                        {t("reviews.replyToReview")}
                       </button>
                     )}
                   </div>
@@ -236,7 +238,7 @@ export default function MyReviewsPage() {
                       onClick={() => setDeleteTarget(r.id)}
                       className="text-sm text-red-600 hover:text-red-700 font-medium"
                     >
-                      Slett vurdering
+                      {t("reviews.deleteReview")}
                     </button>
                     {error && (
                       <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
@@ -250,9 +252,9 @@ export default function MyReviewsPage() {
       )}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Slette vurderingen?"
-        message="Vurderingen blir borte for godt."
-        confirmLabel="Slett"
+        title={t("reviews.deleteConfirmTitle")}
+        message={t("reviews.deleteConfirmMessage")}
+        confirmLabel={t("common.delete")}
         danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}

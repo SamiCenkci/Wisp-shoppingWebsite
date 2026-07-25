@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/lib/i18n";
+import LanguageToggle from "@/components/LanguageToggle";
 
 export default function Navbar() {
+  const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
   const [loggedIn, setLoggedIn] = useState(false);
@@ -140,17 +143,17 @@ export default function Navbar() {
                 setShowRecent(true);
               }}
               onBlur={() => setTimeout(() => setShowRecent(false), 150)}
-              placeholder="Søk..."
+              placeholder={t("nav.searchPlaceholder")}
               className="flex-1 min-w-0 px-4 py-2.5 rounded-l-xl border border-line border-r-0 bg-subtle text-ink outline-none focus:bg-surface focus:border-brand text-sm"
             />
             <button type="submit" className="px-4 py-2.5 rounded-r-xl bg-brand text-white font-medium hover:bg-brand-dark text-sm shrink-0">
-              Søk
+              {t("nav.search")}
             </button>
           </div>
 
           {showRecent && recent.length > 0 && (
             <div className="absolute left-0 right-0 mt-1 bg-surface border border-line rounded-xl shadow-lg py-2 z-50">
-              <p className="px-4 py-1 text-xs font-semibold text-ink-muted">Mine siste søk</p>
+              <p className="px-4 py-1 text-xs font-semibold text-ink-muted">{t("nav.recentSearches")}</p>
               {recent.map((term) => (
                 <button
                   key={term}
@@ -168,7 +171,7 @@ export default function Navbar() {
                   onMouseDown={clearRecent}
                   className="w-full text-left px-4 py-2 text-sm text-ink-secondary hover:bg-subtle hover:text-brand"
                 >
-                  Tøm søkeloggen
+                  {t("nav.clearSearchHistory")}
                 </button>
               </div>
             </div>
@@ -181,16 +184,16 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-1 text-sm shrink-0">
               {loggedIn ? (
                 <>
-                  <button onClick={() => go(`/profile/${userId}`)} className={linkClass}>Min profil</button>
-                  <button onClick={() => go("/my-listings")} className={linkClass}>Mine annonser</button>
-                  <button onClick={() => go("/chat")} className={`${linkClass} inline-flex items-center`}>Meldinger{badge}</button>
-                  <button onClick={() => go("/new")} className="ml-1 px-4 py-2 rounded-xl text-white font-medium bg-brand hover:bg-brand-dark shadow-sm shrink-0">+ Ny annonse</button>
-                  <button onClick={logout} className={linkClass}>Logg ut</button>
+                  <button onClick={() => go(`/profile/${userId}`)} className={linkClass}>{t("nav.myProfile")}</button>
+                  <button onClick={() => go("/my-listings")} className={linkClass}>{t("nav.myListings")}</button>
+                  <button onClick={() => go("/chat")} className={`${linkClass} inline-flex items-center`}>{t("nav.messages")}{badge}</button>
+                  <button onClick={() => go("/new")} className="ml-1 px-4 py-2 rounded-xl text-white font-medium bg-brand hover:bg-brand-dark shadow-sm shrink-0">{t("nav.newListing")}</button>
+                  <button onClick={logout} className={linkClass}>{t("nav.logout")}</button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => go("/login")} className={linkClass}>Logg inn</button>
-                  <button onClick={() => go("/signup")} className="ml-1 px-4 py-2 rounded-xl text-white font-medium bg-brand hover:bg-brand-dark shadow-sm shrink-0">Registrer</button>
+                  <button onClick={() => go("/login")} className={linkClass}>{t("nav.login")}</button>
+                  <button onClick={() => go("/signup")} className="ml-1 px-4 py-2 rounded-xl text-white font-medium bg-brand hover:bg-brand-dark shadow-sm shrink-0">{t("nav.register")}</button>
                 </>
               )}
             </div>
@@ -199,7 +202,7 @@ export default function Navbar() {
             <button
               onClick={() => setMenuOpen((o) => !o)}
               className="md:hidden shrink-0 w-10 h-10 rounded-lg border border-line text-ink flex items-center justify-center text-xl relative"
-              aria-label="Meny"
+              aria-label={t("nav.menu")}
             >
               {menuOpen ? "✕" : "☰"}
               {!menuOpen && unread > 0 && (
@@ -217,18 +220,21 @@ export default function Navbar() {
         <div className="md:hidden border-t border-line bg-surface px-[5%] py-3 flex flex-col gap-1">
           {loggedIn ? (
             <>
-              <button onClick={() => go(`/profile/${userId}`)} className={linkClass}>Min profil</button>
-              <button onClick={() => go("/my-listings")} className={linkClass}>Mine annonser</button>
-              <button onClick={() => go("/chat")} className={`${linkClass} inline-flex items-center`}>Meldinger{badge}</button>
-              <button onClick={() => go("/new")} className="px-3 py-2 rounded-lg text-white font-medium bg-brand hover:bg-brand-dark text-left">+ Ny annonse</button>
-              <button onClick={logout} className={linkClass}>Logg ut</button>
+              <button onClick={() => go(`/profile/${userId}`)} className={linkClass}>{t("nav.myProfile")}</button>
+              <button onClick={() => go("/my-listings")} className={linkClass}>{t("nav.myListings")}</button>
+              <button onClick={() => go("/chat")} className={`${linkClass} inline-flex items-center`}>{t("nav.messages")}{badge}</button>
+              <button onClick={() => go("/new")} className="px-3 py-2 rounded-lg text-white font-medium bg-brand hover:bg-brand-dark text-left">{t("nav.newListing")}</button>
+              <button onClick={logout} className={linkClass}>{t("nav.logout")}</button>
             </>
           ) : (
             <>
-              <button onClick={() => go("/login")} className={linkClass}>Logg inn</button>
-              <button onClick={() => go("/signup")} className="px-3 py-2 rounded-lg text-white font-medium bg-brand hover:bg-brand-dark text-left">Registrer</button>
+              <button onClick={() => go("/login")} className={linkClass}>{t("nav.login")}</button>
+              <button onClick={() => go("/signup")} className="px-3 py-2 rounded-lg text-white font-medium bg-brand hover:bg-brand-dark text-left">{t("nav.register")}</button>
             </>
           )}
+          <div className="pt-1">
+            <LanguageToggle />
+          </div>
         </div>
       )}
     </header>

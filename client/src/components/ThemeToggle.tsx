@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export default function ThemeToggle() {
+  const { t } = useLanguage();
   const [dark, setDark] = useState(false);
 
   // On mount, read saved preference (or system default)
@@ -24,7 +26,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label="Bytt tema"
+      aria-label={t("nav.toggleTheme")}
       className="shrink-0 w-10 h-10 rounded-lg border border-line text-ink flex items-center justify-center text-lg hover:bg-subtle"
     >
       {dark ? "☀️" : "🌙"}
