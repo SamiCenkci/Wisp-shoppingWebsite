@@ -167,7 +167,7 @@ func (q *Queries) GetListingByID(ctx context.Context, id pgtype.UUID) (Listing, 
 
 const getSimilarListings = `-- name: GetSimilarListings :many
 SELECT id, user_id, title, description, price_ore, category, condition, county, municipality, created_at, updated_at, status, ad_type, view_count, sold_to, latitude, longitude, street_address, postal_code, sub_category, product_category, attributes, deleted_at FROM listings
-WHERE category = $1 AND id != $2
+WHERE product_category = $1 AND id != $2
   AND status = 'active'
   AND deleted_at IS NULL
   AND created_at > NOW() - INTERVAL '60 days'
@@ -176,12 +176,12 @@ LIMIT 4
 `
 
 type GetSimilarListingsParams struct {
-	Category string      `json:"category"`
-	ID       pgtype.UUID `json:"id"`
+	ProductCategory string      `json:"product_category"`
+	ID              pgtype.UUID `json:"id"`
 }
 
 func (q *Queries) GetSimilarListings(ctx context.Context, arg GetSimilarListingsParams) ([]Listing, error) {
-	rows, err := q.db.Query(ctx, getSimilarListings, arg.Category, arg.ID)
+	rows, err := q.db.Query(ctx, getSimilarListings, arg.ProductCategory, arg.ID)
 	if err != nil {
 		return nil, err
 	}

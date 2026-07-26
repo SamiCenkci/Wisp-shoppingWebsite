@@ -183,8 +183,8 @@ func (h *Handler) GetOne(c *gin.Context) {
 	seller, _ := h.Queries.GetUserByID(c.Request.Context(), listing.UserID)
 
 	similar, _ := h.Queries.GetSimilarListings(c.Request.Context(), db.GetSimilarListingsParams{
-		Category: listing.Category,
-		ID:       listing.ID,
+		ProductCategory: listing.ProductCategory,
+		ID:              listing.ID,
 	})
 
 	// One query covers this listing's images and all the similar ones.

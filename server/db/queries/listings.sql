@@ -37,7 +37,7 @@ UPDATE listings SET deleted_at = NOW() WHERE id = $1;
 
 -- name: GetSimilarListings :many
 SELECT * FROM listings
-WHERE category = $1 AND id != $2
+WHERE product_category = $1 AND id != $2
   AND status = 'active'
   AND deleted_at IS NULL
   AND created_at > NOW() - INTERVAL '60 days'
